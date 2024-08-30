@@ -231,132 +231,189 @@ def mark_skeleton(skeleton_df, img, img_no_frame, frame_number):
             cv2.line(img_no_frame, points[partA], points[partB], line_color, 1, lineType=cv2.LINE_AA)
     return img, img_no_frame
 
+import cv2
+import os
+import numpy as np
 
-def add_data_to_video(input_video, court_detector, players_detector, ball_detector, strokes_predictions, skeleton_df,
-                      statistics,
-                      show_video, with_frame, output_folder, output_file, p1, p2, f_x, f_y):
+def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_folder, output_file):
     """
-    Creates new videos with pose stickman, face landmarks and blinks counter
-    :param input_video: str, path to the input videos
-    :param df: DataFrame, data of the pose stickman positions
-    :param show_video: bool, display output videos while processing
-    :param with_frame: int, output videos includes the original frame with the landmarks
-    (0 - only landmarks, 1 - original frame with landmarks, 2 - original frame with landmarks and only
-    landmarks (side by side))
+    Creates a new video with only ball tracking overlay.
+    :param input_video: str, path to the input video
+    :param ball_detector: object, detector used to mark ball positions
+    :param show_video: bool, display output video while processing
     :param output_folder: str, path to output folder
     :param output_file: str, name of the output file
     :return: None
     """
 
-    player1_boxes = players_detector.player_1_boxes
-    player2_boxes = players_detector.player_2_boxes
-
-    player1_dists = statistics.bottom_dists_array
-    player2_dists = statistics.top_dists_array
-
-    if skeleton_df is not None:
-        skeleton_df = skeleton_df.fillna(-1)
-
-    # Read videos file
+    # Read video file
     cap = cv2.VideoCapture(input_video)
 
-    # videos properties
-    fps, length, width, height = get_video_properties(cap)
+    # Get video properties
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    final_width = width * 2 if with_frame == 2 else width
-
-    # Video writer
+    # Video writer to save the output
     out = cv2.VideoWriter(os.path.join(output_folder, output_file + '.avi'),
-                          cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (final_width, height))
+                          cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (width, height))
 
-    # initialize frame counters
+    # Initialize frame counter
     frame_number = 0
-    orig_frame = 0
-    while True:
-        orig_frame += 1
-        print('Creating new videos frame %d/%d  ' % (orig_frame, length), '\r', end='')
-        if not orig_frame % 100:
-            print('')
-        ret, img = cap.read()
 
+    while True:
+        ret, img = cap.read()
         if not ret:
             break
 
-        # initialize frame for landmarks only
-        img_no_frame = np.ones_like(img) * 255
-
-        # add Court location
-        img = court_detector.add_court_overlay(img, overlay_color=(0, 0, 255), frame_num=frame_number)
-        img_no_frame = court_detector.add_court_overlay(img_no_frame, overlay_color=(0, 0, 255), frame_num=frame_number)
-
-        # add players locations
-        img = mark_player_box(img, player1_boxes, frame_number)
-        img = mark_player_box(img, player2_boxes, frame_number)
-        img_no_frame = mark_player_box(img_no_frame, player1_boxes, frame_number)
-        img_no_frame = mark_player_box(img_no_frame, player2_boxes, frame_number)
-
-        # add ball location
+        # Add ball location
         img = ball_detector.mark_positions(img, frame_num=frame_number)
-        img_no_frame = ball_detector.mark_positions(img_no_frame, frame_num=frame_number, ball_color='black')
 
-        # add pose stickman
-        if skeleton_df is not None:
-            img, img_no_frame = mark_skeleton(skeleton_df, img, img_no_frame, frame_number)
-
-        # Add stroke prediction
-        for i in range(-10, 10):
-            if frame_number + i in strokes_predictions.keys():
-                '''cv2.putText(img, 'STROKE HIT', (200, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 255) if i != 0 else (255, 0, 0), 3)'''
-
-                probs, stroke = strokes_predictions[frame_number + i]['probs'], strokes_predictions[frame_number + i][
-                    'stroke']
-                cv2.putText(img, 'Forehand - {:.2f}, Backhand - {:.2f}, Service - {:.2f}'.format(*probs),
-                            (70, 400),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-                cv2.putText(img, f'Stroke : {stroke}',
-                            (int(player1_boxes[frame_number][0]) - 10, int(player1_boxes[frame_number][1]) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-
-                break
-        # Add stroke detected
-        for i in range(-5, 10):
-            '''if frame_number + i in p1:
-                cv2.putText(img, 'Stroke detected', (int(player1_boxes[frame_number][0]) - 10, int(player1_boxes[frame_number][1]) - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255) if i != 0 else (255, 0, 0), 2)'''
-
-            if frame_number + i in p2:
-                cv2.putText(img, 'Stroke detected',
-                            (int(f_x(frame_number)) - 30, int(f_y(frame_number)) - 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255) if i != 0 else (255, 0, 0), 2)
-
-        cv2.putText(img, 'Distance: {:.2f} m'.format(player1_dists[frame_number] / 100),
-                    (50, 500),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-        cv2.putText(img, 'Distance: {:.2f} m'.format(player2_dists[frame_number] / 100),
-                    (100, 150),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-
-        # display frame
+        # Display frame if needed
         if show_video:
             cv2.imshow('Output', img)
-            if cv2.waitKey(1) & 0xff == 27:
-                cv2.destroyAllWindows()
+            if cv2.waitKey(1) & 0xff == 27:  # Press 'Esc' to exit
+                break
 
-        # save output videos
-        if with_frame == 0:
-            final_frame = img_no_frame
-        elif with_frame == 1:
-            final_frame = img
-        else:
-            final_frame = np.concatenate([img, img_no_frame], 1)
-        out.write(final_frame)
+        # Save output video
+        out.write(img)
         frame_number += 1
-    print('Creating new video frames %d/%d  ' % (length, length), '\n', end='')
-    print(f'New videos created, file name - {output_file}.avi')
+
+        print(f'Processing frame {frame_number}/{length}', '\r', end='')
+
+    print(f'\nFinished processing video. Output saved as {output_file}.avi')
+
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+
+
+# def add_data_to_video(input_video, court_detector, players_detector, ball_detector, strokes_predictions, skeleton_df,
+#                       statistics,
+#                       show_video, with_frame, output_folder, output_file, p1, p2, f_x, f_y):
+#     """
+#     Creates new videos with pose stickman, face landmarks and blinks counter
+#     :param input_video: str, path to the input videos
+#     :param df: DataFrame, data of the pose stickman positions
+#     :param show_video: bool, display output videos while processing
+#     :param with_frame: int, output videos includes the original frame with the landmarks
+#     (0 - only landmarks, 1 - original frame with landmarks, 2 - original frame with landmarks and only
+#     landmarks (side by side))
+#     :param output_folder: str, path to output folder
+#     :param output_file: str, name of the output file
+#     :return: None
+#     """
+
+#     player1_boxes = players_detector.player_1_boxes
+#     player2_boxes = players_detector.player_2_boxes
+
+#     player1_dists = statistics.bottom_dists_array
+#     player2_dists = statistics.top_dists_array
+
+#     if skeleton_df is not None:
+#         skeleton_df = skeleton_df.fillna(-1)
+
+#     # Read videos file
+#     cap = cv2.VideoCapture(input_video)
+
+#     # videos properties
+#     fps, length, width, height = get_video_properties(cap)
+
+#     final_width = width * 2 if with_frame == 2 else width
+
+#     # Video writer
+#     out = cv2.VideoWriter(os.path.join(output_folder, output_file + '.avi'),
+#                           cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (final_width, height))
+
+#     # initialize frame counters
+#     frame_number = 0
+#     orig_frame = 0
+#     while True:
+#         orig_frame += 1
+#         print('Creating new videos frame %d/%d  ' % (orig_frame, length), '\r', end='')
+#         if not orig_frame % 100:
+#             print('')
+#         ret, img = cap.read()
+
+#         if not ret:
+#             break
+
+#         # initialize frame for landmarks only
+#         img_no_frame = np.ones_like(img) * 255
+
+#         # add Court location
+#         img = court_detector.add_court_overlay(img, overlay_color=(0, 0, 255), frame_num=frame_number)
+#         img_no_frame = court_detector.add_court_overlay(img_no_frame, overlay_color=(0, 0, 255), frame_num=frame_number)
+
+#         # add players locations
+#         img = mark_player_box(img, player1_boxes, frame_number)
+#         img = mark_player_box(img, player2_boxes, frame_number)
+#         img_no_frame = mark_player_box(img_no_frame, player1_boxes, frame_number)
+#         img_no_frame = mark_player_box(img_no_frame, player2_boxes, frame_number)
+
+#         # add ball location
+#         img = ball_detector.mark_positions(img, frame_num=frame_number)
+#         img_no_frame = ball_detector.mark_positions(img_no_frame, frame_num=frame_number, ball_color='black')
+
+#         # add pose stickman
+#         if skeleton_df is not None:
+#             img, img_no_frame = mark_skeleton(skeleton_df, img, img_no_frame, frame_number)
+
+#         # Add stroke prediction
+#         for i in range(-10, 10):
+#             if frame_number + i in strokes_predictions.keys():
+#                 '''cv2.putText(img, 'STROKE HIT', (200, 200),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 255) if i != 0 else (255, 0, 0), 3)'''
+
+#                 probs, stroke = strokes_predictions[frame_number + i]['probs'], strokes_predictions[frame_number + i][
+#                     'stroke']
+#                 cv2.putText(img, 'Forehand - {:.2f}, Backhand - {:.2f}, Service - {:.2f}'.format(*probs),
+#                             (70, 400),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+#                 cv2.putText(img, f'Stroke : {stroke}',
+#                             (int(player1_boxes[frame_number][0]) - 10, int(player1_boxes[frame_number][1]) - 10),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+
+#                 break
+#         # Add stroke detected
+#         for i in range(-5, 10):
+#             '''if frame_number + i in p1:
+#                 cv2.putText(img, 'Stroke detected', (int(player1_boxes[frame_number][0]) - 10, int(player1_boxes[frame_number][1]) - 10),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255) if i != 0 else (255, 0, 0), 2)'''
+
+#             if frame_number + i in p2:
+#                 cv2.putText(img, 'Stroke detected',
+#                             (int(f_x(frame_number)) - 30, int(f_y(frame_number)) - 50),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255) if i != 0 else (255, 0, 0), 2)
+
+#         cv2.putText(img, 'Distance: {:.2f} m'.format(player1_dists[frame_number] / 100),
+#                     (50, 500),
+#                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+#         cv2.putText(img, 'Distance: {:.2f} m'.format(player2_dists[frame_number] / 100),
+#                     (100, 150),
+#                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+
+#         # display frame
+#         if show_video:
+#             cv2.imshow('Output', img)
+#             if cv2.waitKey(1) & 0xff == 27:
+#                 cv2.destroyAllWindows()
+
+#         # save output videos
+#         if with_frame == 0:
+#             final_frame = img_no_frame
+#         elif with_frame == 1:
+#             final_frame = img
+#         else:
+#             final_frame = np.concatenate([img, img_no_frame], 1)
+#         out.write(final_frame)
+#         frame_number += 1
+#     print('Creating new video frames %d/%d  ' % (length, length), '\n', end='')
+#     print(f'New videos created, file name - {output_file}.avi')
+#     cap.release()
+#     out.release()
+#     cv2.destroyAllWindows()
 
 
 def create_top_view(court_detector, detection_model):
@@ -492,19 +549,23 @@ def video_process(video_path, show_video=False, include_video=True,
     statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
     statistics.get_players_dists()
 
-    add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
-                      ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
-                      statistics=statistics,
-                      show_video=show_video, with_frame=1, output_folder=output_folder, output_file=output_file,
-                      p1=player_1_strokes_indices, p2=player_2_strokes_indices, f_x=f2_x, f_y=f2_y)
 
-    # ball_detector.show_y_graph(detection_model.player_1_boxes, detection_model.player_2_boxes)
+    add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
+
+    # add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
+    #                   ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
+    #                   statistics=statistics,
+    #                   show_video=show_video, with_frame=1, output_folder=output_folder, output_file=output_file,
+    #                   p1=player_1_strokes_indices, p2=player_2_strokes_indices, f_x=f2_x, f_y=f2_y)
+
+    ball_detector.show_y_graph(detection_model.player_1_boxes, detection_model.player_2_boxes)
 
 
 def main():
     s = time.time()
-    video_process(video_path='../videos/vid1 copy.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
-                  court=True, top_view=True)
+    # MUST TURN ON : show_video , stickman , smoothing , 
+    video_process(video_path='../videos/vid1.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+                  court=False, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 
 
