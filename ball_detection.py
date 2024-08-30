@@ -150,44 +150,42 @@ class BallDetector:
             else:
                 smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
         return smoothed_positions
-    def detect_ball_in_roi(self, frame, roi):
-        # Crop the frame to the ROI
-        x, y, w, h = roi
-        cropped_frame = frame[y:y+h, x:x+w]
+    # def detect_ball_in_roi(self, frame, roi):
+    #     # Crop the frame to the ROI
+    #     x, y, w, h = roi
+    #     cropped_frame = frame[y:y+h, x:x+w]
         
-        # Perform object detection on the cropped frame
-        # (Replace this with your actual detection code)
-        detected_objects = self.yolo_detection(cropped_frame)
+    #     # Perform object detection on the cropped frame
+    #     # (Replace this with your actual detection code)
+    #     detected_objects = self.yolo_detection(cropped_frame)
         
-        # Adjust detected objects' coordinates to the original frame
-        for obj in detected_objects:
-            obj.x += x
-            obj.y += y
+    #     # Adjust detected objects' coordinates to the original frame
+    #     for obj in detected_objects:
+    #         obj.x += x
+    #         obj.y += y
         
-        return detected_objects
+    #     return detected_objects
 
     def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
         base_color = ImageColor.getrgb(ball_color)
-        # If frame number is not given, use the last positions found
         if frame_num is not None:
-            # Ensure there are enough positions
-            if frame_num - trail_length + 1 < 0:
-                positions = self.xy_coordinates[:frame_num + 1, :]
-            else:
-                positions = self.xy_coordinates[frame_num-trail_length+1:frame_num+1, :]
+            # Get positions from the frame number with a limit on trail length
+            positions = self.xy_coordinates[max(0, frame_num - trail_length + 1):frame_num + 1, :]
         else:
+            # Get the last 'trail_length' positions
             positions = self.xy_coordinates[-trail_length:, :]
 
         # Apply smoothing
-        # positions = self.smooth_positions(positions)
+        positions = self.smooth_positions(positions)
+
         
         # Append the current position
-        if frame_num is not None and len(self.xy_coordinates) > frame_num:
-            current_position = self.xy_coordinates[frame_num]
-            if current_position[0] is not None and current_position[1] is not None:
-                positions.append(current_position)
-            else:
-                positions.append((None, None))
+        # if frame_num is not None and len(self.xy_coordinates) > frame_num:
+        #     current_position = self.xy_coordinates[frame_num]
+        #     if current_position[0] is not None and current_position[1] is not None:
+        #         positions.append(current_position)
+        #     else:
+        #         positions.append((None, None))
 
         positions = np.array(positions)
         pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -218,7 +216,7 @@ class BallDetector:
                    min(frame.shape[0], y + self.search_radius) - max(0, y - self.search_radius))
             
             # Perform detection in the ROI
-            detected_objects = self.detect_ball_in_roi(frame, roi)
+            # detected_objects = self.detect_ball_in_roi(frame, roi)
             
             # Process detected objects as needed
 
