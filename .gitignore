@@ -5,4 +5,11 @@
 /*.docx
 /report/
 /dataset/
-/myenv/
+
+# Ignore virtual environments
+myenv/
+
+# Ignore large binary files
+*.dylib
+*.so
+*.bin
