@@ -427,14 +427,14 @@ def create_top_view(court_detector, detection_model):
     out = cv2.VideoWriter('output/top_view.avi',
                           cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 30, (v_width, v_height))
     # players location on court
-    smoothed_1, smoothed_2 = detection_model.calculate_feet_positions(court_detector)
+    # smoothed_1, smoothed_2 = detection_model.calculate_feet_positions(court_detector)
 
-    for feet_pos_1, feet_pos_2 in zip(smoothed_1, smoothed_2):
-        frame = court.copy()
-        frame = cv2.circle(frame, (int(feet_pos_1[0]), int(feet_pos_1[1])), 10, (0, 0, 255), 15)
-        if feet_pos_2[0] is not None:
-            frame = cv2.circle(frame, (int(feet_pos_2[0]), int(feet_pos_2[1])), 10, (0, 0, 255), 15)
-        out.write(frame)
+    # for feet_pos_1, feet_pos_2 in zip(smoothed_1, smoothed_2):
+    #     frame = court.copy()
+    #     frame = cv2.circle(frame, (int(feet_pos_1[0]), int(feet_pos_1[1])), 10, (0, 0, 255), 15)
+    #     if feet_pos_2[0] is not None:
+    #         frame = cv2.circle(frame, (int(feet_pos_2[0]), int(feet_pos_2[1])), 10, (0, 0, 255), 15)
+    #     out.write(frame)
     out.release()
     cv2.destroyAllWindows()
 
@@ -494,7 +494,7 @@ def video_process(video_path, show_video=False, include_video=True,
 
             # court_detector.track_court(frame)
 
-            # detect
+            # # detect
             # detection_model.detect_player_1(frame.copy(), court_detector)
             # detection_model.detect_top_persons(frame, court_detector, frame_i)
 
@@ -515,39 +515,39 @@ def video_process(video_path, show_video=False, include_video=True,
     video.release()
     cv2.destroyAllWindows()
 
-    detection_model.find_player_2_box()
+    # detection_model.find_player_2_box()
 
-    if top_view:
-        create_top_view(court_detector, detection_model)
+    # if top_view:
+    #     create_top_view(court_detector, detection_model)
 
     # Save landmarks in csv files
-    df = None
-    # Save stickman data
-    if stickman:
-        df = pose_extractor.save_to_csv(output_folder)
+    # df = None
+    # # Save stickman data
+    # if stickman:
+    #     df = pose_extractor.save_to_csv(output_folder)
 
     # smooth the output data for better results
-    df_smooth = None
-    if smoothing:
-        smoother = Smooth()
-        df_smooth = smoother.smooth(df)
-        smoother.save_to_csv(output_folder)
+    # df_smooth = None
+    # if smoothing:
+    #     smoother = Smooth()
+    #     df_smooth = smoother.smooth(df)
+    #     smoother.save_to_csv(output_folder)
 
-    player_1_strokes_indices, player_2_strokes_indices, bounces_indices, f2_x, f2_y = find_strokes_indices(
-        detection_model.player_1_boxes,
-        detection_model.player_2_boxes,
-        ball_detector.xy_coordinates,
-        df_smooth)
+    # player_1_strokes_indices, player_2_strokes_indices, bounces_indices, f2_x, f2_y = find_strokes_indices(
+    #     detection_model.player_1_boxes,
+    #     detection_model.player_2_boxes,
+    #     ball_detector.xy_coordinates,
+    #     df_smooth)
 
-    '''ball_detector.bounces_indices = bounces_indices
-    ball_detector.coordinates = (f2_x, f2_y)'''
+    # '''ball_detector.bounces_indices = bounces_indices
+    # ball_detector.coordinates = (f2_x, f2_y)'''
     # predictions = get_stroke_predictions(video_path, stroke_recognition,
     #                                      player_1_strokes_indices, detection_model.player_1_boxes)
 
-    statistics = Statistics(court_detector, detection_model)
-    heatmap = statistics.get_player_position_heatmap()
-    statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
-    statistics.get_players_dists()
+    # statistics = Statistics(court_detector, detection_model)
+    # heatmap = statistics.get_player_position_heatmap()
+    # statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
+    # statistics.get_players_dists()
 
 
     add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
