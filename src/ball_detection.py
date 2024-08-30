@@ -44,6 +44,8 @@ class BallDetector:
     Ball Detector model responsible for receiving the frames and detecting the ball
     """
     def __init__(self, save_state, out_channels=2):
+        # self.search_radius = 50
+
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Load TrackNet model weights
         self.detector = BallTrackerNet(out_channels=out_channels)
@@ -138,44 +140,71 @@ class BallDetector:
     #     return frame
 
 
+    def smooth_positions(self, positions):
+        smoothed_positions = []
+        for i in range(len(positions)):
+            # Filter out None values before computing the mean
+            valid_positions = [pos for pos in positions[:i+1] if pos[0] is not None and pos[1] is not None]
+            if valid_positions:  # Only calculate mean if there are valid positions
+                smoothed_positions.append(np.mean(valid_positions, axis=0))
+            else:
+                smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
+        return smoothed_positions
+
+
     def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
-        """
-        Create a comet tail effect by marking and interpolating the last 'trail_length' positions of the ball in the frame
-        :param frame: the frame we mark the positions in
-        :param trail_length: number of previous detection to mark (length of the trail)
-        :param frame_num: current frame number
-        :param ball_color: color of the marks
-        :return: the frame with the ball annotations
-        """
-        # Color fading setup
-        color_fade = [int(c) for c in ImageColor.getrgb(ball_color)]
-        
+        base_color = ImageColor.getrgb(ball_color)
         # If frame number is not given, use the last positions found
         if frame_num is not None:
-            positions = self.xy_coordinates[frame_num-trail_length+1:frame_num+1, :]
+            # Ensure there are enough positions
+            if frame_num - trail_length + 1 < 0:
+                positions = self.xy_coordinates[:frame_num + 1, :]
+            else:
+                positions = self.xy_coordinates[frame_num-trail_length+1:frame_num+1, :]
         else:
             positions = self.xy_coordinates[-trail_length:, :]
+
+        # Apply smoothing
+        # positions = self.smooth_positions(positions)
         
+        # Append the current position
+        if frame_num is not None and len(self.xy_coordinates) > frame_num:
+            current_position = self.xy_coordinates[frame_num]
+            if current_position[0] is not None and current_position[1] is not None:
+                positions.append(current_position)
+            else:
+                positions.append((None, None))
+        positions = np.array(positions)
+
+        # Rest of the code remains the same as before
         pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(pil_image)
-        draw = ImageDraw.Draw(pil_image)
+        draw = ImageDraw.Draw(pil_image, "RGBA")
 
-        # Draw the comet tail effect
+        # Example thicknesses
+        # thicknesses = [10,5,3,2,1]
+        thicknesses = [1,2,3,4,5]
+
+
         for i in range(1, len(positions)):
             if positions[i-1, 0] is not None and positions[i, 0] is not None:
-                # Calculate the fading color for the tail
+                # Calculate the fade factor for transparency
                 fade_factor = i / len(positions)
-                faded_color = tuple(int(c * fade_factor) for c in color_fade)
-                
-                # Draw a line or interpolated ellipses between the points
-                draw.line((positions[i-1, 0], positions[i-1, 1], positions[i, 0], positions[i, 1]), fill=faded_color, width=3)
-                
-                # Optionally, draw a circle at each position with fading effect
-                draw.ellipse((positions[i, 0] - 3, positions[i, 1] - 3, positions[i, 0] + 3, positions[i, 1] + 3), fill=faded_color)
+                transparency = int(255 * fade_factor)
+                faded_color_with_alpha = base_color + (transparency,)
 
-        # Convert PIL image format back to OpenCV image format
+                # Use predetermined thicknesses
+                line_thickness = thicknesses[i-1]
+
+                draw.line(
+                    (positions[i-1, 0], positions[i-1, 1], positions[i, 0], positions[i, 1]),
+                    fill=faded_color_with_alpha,
+                    width=line_thickness
+                )
+
         frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
         return frame
+
 
 
     def show_y_graph(self, player_1_boxes, player_2_boxes):
@@ -210,6 +239,7 @@ class BallDetector:
 
 
 if __name__ == "__main__":
+    print('====== RUNNING ball_dectection MAIN ======')
     ball_detector = BallDetector('saved states/tracknet_weights_lr_1.0_epochs_150_last_trained.pth')
     cap = cv2.VideoCapture('../videos/vid1.mp4')
     # get videos properties

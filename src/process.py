@@ -235,33 +235,28 @@ import cv2
 import os
 import numpy as np
 
+"""
+Creates a new video with only ball tracking overlay.
+:param input_video: str, path to the input video
+:param ball_detector: object, detector used to mark ball positions
+:param show_video: bool, display output video while processing
+:param output_folder: str, path to output folder
+:param output_file: str, name of the output file
+:return: None
+"""
 def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_folder, output_file):
-    """
-    Creates a new video with only ball tracking overlay.
-    :param input_video: str, path to the input video
-    :param ball_detector: object, detector used to mark ball positions
-    :param show_video: bool, display output video while processing
-    :param output_folder: str, path to output folder
-    :param output_file: str, name of the output file
-    :return: None
-    """
-
     # Read video file
     cap = cv2.VideoCapture(input_video)
-
     # Get video properties
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
     # Video writer to save the output
     out = cv2.VideoWriter(os.path.join(output_folder, output_file + '.avi'),
                           cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (width, height))
-
     # Initialize frame counter
     frame_number = 0
-
     while True:
         ret, img = cap.read()
         if not ret:
@@ -462,9 +457,9 @@ def video_process(video_path, show_video=False, include_video=True,
 
     # initialize extractors
     court_detector = CourtDetector()
-    detection_model = DetectionModel(dtype=dtype)
-    pose_extractor = PoseExtractor(person_num=1, box=stickman_box, dtype=dtype) if stickman else None
-    stroke_recognition = ActionRecognition('storke_classifier_weights.pth')
+    # detection_model = DetectionModel(dtype=dtype)
+    # pose_extractor = PoseExtractor(person_num=1, box=stickman_box, dtype=dtype) if stickman else None
+    # stroke_recognition = ActionRecognition('storke_classifier_weights.pth')
     ball_detector = BallDetector('saved states/tracknet_weights_2_classes.pth', out_channels=2)
 
     # Load videos from videos path
@@ -491,16 +486,16 @@ def video_process(video_path, show_video=False, include_video=True,
                 print(f'Court detection {"Success" if court_detector.success_flag else "Failed"}')
                 print(f'Time to detect court :  {time.time() - start_time} seconds')
                 start_time = time.time()
+            # if True:
+            #     court_detector.track_court(frame)
 
-            # court_detector.track_court(frame)
+            #     # detect
+            #     detection_model.detect_player_1(frame.copy(), court_detector)
+            #     detection_model.detect_top_persons(frame, court_detector, frame_i)
 
-            # # detect
-            # detection_model.detect_player_1(frame.copy(), court_detector)
-            # detection_model.detect_top_persons(frame, court_detector, frame_i)
-
-            # Create stick man figure (pose detection)
-            # if stickman:
-            #     pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
+            #     Create stick man figure (pose detection)
+            #     if stickman:
+            #         pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
 
             ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
 
@@ -514,41 +509,40 @@ def video_process(video_path, show_video=False, include_video=True,
     print('Processing completed')
     video.release()
     cv2.destroyAllWindows()
+    # if True:
+    #     detection_model.find_player_2_box()
 
-    # detection_model.find_player_2_box()
+    #     if top_view:
+    #         create_top_view(court_detector, detection_model)
 
-    # if top_view:
-    #     create_top_view(court_detector, detection_model)
+    #     Save landmarks in csv files
+    #     df = None
+    #     # Save stickman data
+    #     if stickman:
+    #         df = pose_extractor.save_to_csv(output_folder)
 
-    # Save landmarks in csv files
-    # df = None
-    # # Save stickman data
-    # if stickman:
-    #     df = pose_extractor.save_to_csv(output_folder)
+    #     smooth the output data for better results
+    #     df_smooth = None
+    #     if smoothing:
+    #         smoother = Smooth()
+    #         df_smooth = smoother.smooth(df)
+    #         smoother.save_to_csv(output_folder)
 
-    # smooth the output data for better results
-    # df_smooth = None
-    # if smoothing:
-    #     smoother = Smooth()
-    #     df_smooth = smoother.smooth(df)
-    #     smoother.save_to_csv(output_folder)
+    #     player_1_strokes_indices, player_2_strokes_indices, bounces_indices, f2_x, f2_y = find_strokes_indices(
+    #         detection_model.player_1_boxes,
+    #         detection_model.player_2_boxes,
+    #         ball_detector.xy_coordinates,
+    #         df_smooth)
 
-    # player_1_strokes_indices, player_2_strokes_indices, bounces_indices, f2_x, f2_y = find_strokes_indices(
-    #     detection_model.player_1_boxes,
-    #     detection_model.player_2_boxes,
-    #     ball_detector.xy_coordinates,
-    #     df_smooth)
+    #     '''ball_detector.bounces_indices = bounces_indices
+    #     ball_detector.coordinates = (f2_x, f2_y)'''
+    #     predictions = get_stroke_predictions(video_path, stroke_recognition,
+    #                                          player_1_strokes_indices, detection_model.player_1_boxes)
 
-    # '''ball_detector.bounces_indices = bounces_indices
-    # ball_detector.coordinates = (f2_x, f2_y)'''
-    # predictions = get_stroke_predictions(video_path, stroke_recognition,
-    #                                      player_1_strokes_indices, detection_model.player_1_boxes)
-
-    # statistics = Statistics(court_detector, detection_model)
-    # heatmap = statistics.get_player_position_heatmap()
-    # statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
-    # statistics.get_players_dists()
-
+    #     statistics = Statistics(court_detector, detection_model)
+    #     heatmap = statistics.get_player_position_heatmap()
+    #     statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
+    #     statistics.get_players_dists()
 
     add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
 
@@ -564,7 +558,7 @@ def video_process(video_path, show_video=False, include_video=True,
 def main():
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
-    video_process(video_path='../videos/vid1.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path='../videos/test4.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 
