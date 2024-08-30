@@ -151,7 +151,9 @@ class BallDetector:
                 if  (xdiff/positions[i-1][0]) > 0.2  or ( (ydiff/positions[i-1][1]) > 0.2 ) :
                     print(' OUTLIER!! : \n', positions[i][0] , ' - ', positions[i-1][0])
                     print(positions[i][1] , ' - ', positions[i-1][1])
-                    continue
+                    # continue
+                    positions[i][0] = positions[i-1][0]
+                    positions[i][1] = positions[i-1][1]
                 print(">>>" , positions[i])
                 fade_factor = i / len(positions)
                 transparency = int(255 * fade_factor)
