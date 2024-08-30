@@ -44,7 +44,7 @@ class BallDetector:
     Ball Detector model responsible for receiving the frames and detecting the ball
     """
     def __init__(self, save_state, out_channels=2):
-        # self.search_radius = 50
+        self.search_radius = 50
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Load TrackNet model weights
@@ -150,7 +150,21 @@ class BallDetector:
             else:
                 smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
         return smoothed_positions
-
+    def detect_ball_in_roi(self, frame, roi):
+        # Crop the frame to the ROI
+        x, y, w, h = roi
+        cropped_frame = frame[y:y+h, x:x+w]
+        
+        # Perform object detection on the cropped frame
+        # (Replace this with your actual detection code)
+        detected_objects = self.yolo_detection(cropped_frame)
+        
+        # Adjust detected objects' coordinates to the original frame
+        for obj in detected_objects:
+            obj.x += x
+            obj.y += y
+        
+        return detected_objects
 
     def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
         base_color = ImageColor.getrgb(ball_color)
@@ -174,33 +188,39 @@ class BallDetector:
                 positions.append(current_position)
             else:
                 positions.append((None, None))
-        positions = np.array(positions)
 
-        # Rest of the code remains the same as before
+        positions = np.array(positions)
         pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(pil_image)
         draw = ImageDraw.Draw(pil_image, "RGBA")
 
-        # Example thicknesses
-        # thicknesses = [10,5,3,2,1]
         thicknesses = [1,2,3,4,5]
-
 
         for i in range(1, len(positions)):
             if positions[i-1, 0] is not None and positions[i, 0] is not None:
-                # Calculate the fade factor for transparency
                 fade_factor = i / len(positions)
                 transparency = int(255 * fade_factor)
                 faded_color_with_alpha = base_color + (transparency,)
-
-                # Use predetermined thicknesses
-                line_thickness = thicknesses[i-1]
+                line_thickness = thicknesses[min(i-1, len(thicknesses)-1)]
 
                 draw.line(
                     (positions[i-1, 0], positions[i-1, 1], positions[i, 0], positions[i, 1]),
                     fill=faded_color_with_alpha,
                     width=line_thickness
                 )
+
+        # Determine ROI based on the last known position
+        if positions[-1, 0] is not None and positions[-1, 1] is not None:
+            last_known_position = positions[-1]
+            x, y = int(last_known_position[0]), int(last_known_position[1])
+            roi = (max(0, x - self.search_radius), max(0, y - self.search_radius),
+                   min(frame.shape[1], x + self.search_radius) - max(0, x - self.search_radius),
+                   min(frame.shape[0], y + self.search_radius) - max(0, y - self.search_radius))
+            
+            # Perform detection in the ROI
+            detected_objects = self.detect_ball_in_roi(frame, roi)
+            
+            # Process detected objects as needed
 
         frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
         return frame
