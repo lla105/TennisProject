@@ -241,6 +241,8 @@ class CourtDetector:
                 for i, configuration in self.court_reference.court_conf.items():
                     # Find transformation
                     matrix, _ = cv2.findHomography(np.float32(configuration), np.float32(intersections), method=0)
+                    # inv_matrix = cv2.invert(matrix.astype(np.float32))[1]
+
                     inv_matrix = cv2.invert(matrix)[1]
                     # Get transformation score
                     confi_score = self._get_confi_score(matrix)

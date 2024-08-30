@@ -99,7 +99,7 @@ class BallDetector:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
 
-    def mark_positions(self, frame, mark_num=4, frame_num=None, ball_color='yellow'):
+    def mark_positions(self, frame, mark_num=40, frame_num=None, ball_color='yellow'):
         """
         Mark the last 'mark_num' positions of the ball in the frame
         :param frame: the frame we mark the positions in
@@ -130,7 +130,8 @@ class BallDetector:
                 if bounce_i is not None and i == bounce_i:
                     draw.ellipse(bbox, outline='red')
                 else:
-                    draw.ellipse(bbox, outline=ball_color)
+                    # draw.ellipse(bbox, outline=ball_color)
+                    draw.ellipse(bbox, fill=ball_color)
 
             # Convert PIL image format back to opencv image format
             frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
