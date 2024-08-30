@@ -492,15 +492,15 @@ def video_process(video_path, show_video=False, include_video=True,
                 print(f'Time to detect court :  {time.time() - start_time} seconds')
                 start_time = time.time()
 
-            court_detector.track_court(frame)
+            # court_detector.track_court(frame)
 
             # detect
-            detection_model.detect_player_1(frame.copy(), court_detector)
-            detection_model.detect_top_persons(frame, court_detector, frame_i)
+            # detection_model.detect_player_1(frame.copy(), court_detector)
+            # detection_model.detect_top_persons(frame, court_detector, frame_i)
 
             # Create stick man figure (pose detection)
-            if stickman:
-                pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
+            # if stickman:
+            #     pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
 
             ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
 
@@ -541,8 +541,8 @@ def video_process(video_path, show_video=False, include_video=True,
 
     '''ball_detector.bounces_indices = bounces_indices
     ball_detector.coordinates = (f2_x, f2_y)'''
-    predictions = get_stroke_predictions(video_path, stroke_recognition,
-                                         player_1_strokes_indices, detection_model.player_1_boxes)
+    # predictions = get_stroke_predictions(video_path, stroke_recognition,
+    #                                      player_1_strokes_indices, detection_model.player_1_boxes)
 
     statistics = Statistics(court_detector, detection_model)
     heatmap = statistics.get_player_position_heatmap()
@@ -558,7 +558,7 @@ def video_process(video_path, show_video=False, include_video=True,
     #                   show_video=show_video, with_frame=1, output_folder=output_folder, output_file=output_file,
     #                   p1=player_1_strokes_indices, p2=player_2_strokes_indices, f_x=f2_x, f_y=f2_y)
 
-    ball_detector.show_y_graph(detection_model.player_1_boxes, detection_model.player_2_boxes)
+    # ball_detector.show_y_graph(detection_model.player_1_boxes, detection_model.player_2_boxes)
 
 
 def main():
