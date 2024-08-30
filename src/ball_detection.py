@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import torch
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageColor
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
@@ -99,43 +99,84 @@ class BallDetector:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
 
-    def mark_positions(self, frame, mark_num=40, frame_num=None, ball_color='yellow'):
+    # def mark_positions(self, frame, mark_num=40, frame_num=None, ball_color='yellow'):
+    #     """
+    #     Mark the last 'mark_num' positions of the ball in the frame
+    #     :param frame: the frame we mark the positions in
+    #     :param mark_num: number of previous detection to mark
+    #     :param frame_num: current frame number
+    #     :param ball_color: color of the marks
+    #     :return: the frame with the ball annotations
+    #     """
+    #     bounce_i = None
+    #     # if frame number is not given, use the last positions found
+    #     if frame_num is not None:
+    #         q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
+    #         for i in range(frame_num - mark_num + 1, frame_num + 1):
+    #             if i in self.bounces_indices:
+    #                 bounce_i = i - frame_num + mark_num - 1
+    #                 break
+    #     else:
+    #         q = self.xy_coordinates[-mark_num:, :]
+    #     pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    #     pil_image = Image.fromarray(pil_image)
+    #     # Mark each position by a circle
+    #     for i in range(q.shape[0]):
+    #         if q[i, 0] is not None:
+    #             draw_x = q[i, 0]
+    #             draw_y = q[i, 1]
+    #             bbox = (draw_x - 2, draw_y - 2, draw_x + 2, draw_y + 2)
+    #             draw = ImageDraw.Draw(pil_image)
+    #             if bounce_i is not None and i == bounce_i:
+    #                 draw.ellipse(bbox, outline='red')
+    #             else:
+    #                 # draw.ellipse(bbox, outline=ball_color)
+    #                 draw.ellipse(bbox, fill=ball_color)
+
+    #         # Convert PIL image format back to opencv image format
+    #         frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+    #     return frame
+
+
+    def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
         """
-        Mark the last 'mark_num' positions of the ball in the frame
+        Create a comet tail effect by marking and interpolating the last 'trail_length' positions of the ball in the frame
         :param frame: the frame we mark the positions in
-        :param mark_num: number of previous detection to mark
+        :param trail_length: number of previous detection to mark (length of the trail)
         :param frame_num: current frame number
         :param ball_color: color of the marks
         :return: the frame with the ball annotations
         """
-        bounce_i = None
-        # if frame number is not given, use the last positions found
+        # Color fading setup
+        color_fade = [int(c) for c in ImageColor.getrgb(ball_color)]
+        
+        # If frame number is not given, use the last positions found
         if frame_num is not None:
-            q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
-            for i in range(frame_num - mark_num + 1, frame_num + 1):
-                if i in self.bounces_indices:
-                    bounce_i = i - frame_num + mark_num - 1
-                    break
+            positions = self.xy_coordinates[frame_num-trail_length+1:frame_num+1, :]
         else:
-            q = self.xy_coordinates[-mark_num:, :]
+            positions = self.xy_coordinates[-trail_length:, :]
+        
         pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(pil_image)
-        # Mark each position by a circle
-        for i in range(q.shape[0]):
-            if q[i, 0] is not None:
-                draw_x = q[i, 0]
-                draw_y = q[i, 1]
-                bbox = (draw_x - 2, draw_y - 2, draw_x + 2, draw_y + 2)
-                draw = ImageDraw.Draw(pil_image)
-                if bounce_i is not None and i == bounce_i:
-                    draw.ellipse(bbox, outline='red')
-                else:
-                    # draw.ellipse(bbox, outline=ball_color)
-                    draw.ellipse(bbox, fill=ball_color)
+        draw = ImageDraw.Draw(pil_image)
 
-            # Convert PIL image format back to opencv image format
-            frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        # Draw the comet tail effect
+        for i in range(1, len(positions)):
+            if positions[i-1, 0] is not None and positions[i, 0] is not None:
+                # Calculate the fading color for the tail
+                fade_factor = i / len(positions)
+                faded_color = tuple(int(c * fade_factor) for c in color_fade)
+                
+                # Draw a line or interpolated ellipses between the points
+                draw.line((positions[i-1, 0], positions[i-1, 1], positions[i, 0], positions[i, 1]), fill=faded_color, width=3)
+                
+                # Optionally, draw a circle at each position with fading effect
+                draw.ellipse((positions[i, 0] - 3, positions[i, 1] - 3, positions[i, 0] + 3, positions[i, 1] + 3), fill=faded_color)
+
+        # Convert PIL image format back to OpenCV image format
+        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
         return frame
+
 
     def show_y_graph(self, player_1_boxes, player_2_boxes):
         """
