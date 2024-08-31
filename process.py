@@ -482,9 +482,9 @@ def video_process(video_path, show_video=False, include_video=True,
 
         if ret:
             if frame_i == 1:
-                court_detector.detect(frame)
-                print(f'Court detection {"Success" if court_detector.success_flag else "Failed"}')
-                print(f'Time to detect court :  {time.time() - start_time} seconds')
+                # court_detector.detect(frame)
+                # print(f'Court detection {"Success" if court_detector.success_flag else "Failed"}')
+                # print(f'Time to detect court :  {time.time() - start_time} seconds')
                 start_time = time.time()
             # if True:
             #     court_detector.track_court(frame)
@@ -497,7 +497,8 @@ def video_process(video_path, show_video=False, include_video=True,
             #     if stickman:
             #         pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
 
-            ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
+            # ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
+            ball_detector.detect_ball(frame)
 
             total_time += (time.time() - start_time)
             print('Processing frame %d/%d  FPS %04f' % (frame_i, length, frame_i / total_time), '\r', end='')
@@ -558,7 +559,7 @@ def video_process(video_path, show_video=False, include_video=True,
 def main():
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
-    video_process(video_path='../videos/test4.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path='../videos/0828.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 

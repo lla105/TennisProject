@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import torch
-from PIL import Image, ImageDraw, ImageColor
+from PIL import Image, ImageDraw, ImageColor, ImageFont
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
@@ -142,19 +142,38 @@ class BallDetector:
         pil_image = Image.fromarray(pil_image)
         draw = ImageDraw.Draw(pil_image, "RGBA")
 
+        font = ImageFont.load_default()
+        image_width = self.video_width
+        image_height = self.video_height
+
         thicknesses = [1,2,3,4,5]
 
+        threshold_percentage = 0.2  # 20% threshold for relative differences
+
         for i in range(1, len(positions)):
+            isBad = False
             if positions[i-1][0] is not None and positions[i][0] is not None:
-                xdiff = abs(positions[i][0]-positions[i-1][0])
-                ydiff = abs(positions[i][1]-positions[i-1][1])
-                if  (xdiff/positions[i-1][0]) > 0.2  or ( (ydiff/positions[i-1][1]) > 0.2 ) :
-                    print(' OUTLIER!! : \n', positions[i][0] , ' - ', positions[i-1][0])
-                    print(positions[i][1] , ' - ', positions[i-1][1])
-                    # continue
+                xdiff = abs(positions[i][0] - positions[i-1][0])
+                ydiff = abs(positions[i][1] - positions[i-1][1])
+                prev_x = positions[i-1][0]
+                prev_y = positions[i-1][1]
+
+                # Calculate relative differences
+                x_relative_diff = xdiff / prev_x if prev_x != 0 else 0
+                y_relative_diff = ydiff / prev_y if prev_y != 0 else 0
+
+                # Define outlier criteria
+                if x_relative_diff > threshold_percentage or y_relative_diff > threshold_percentage:
+                    isBad = True
+                    print(' OUTLIER!! : >>>(', positions[i][0], positions[i][1], ')')
+                    # Use previous position to replace the outlier
                     positions[i][0] = positions[i-1][0]
                     positions[i][1] = positions[i-1][1]
-                print(">>>" , positions[i])
+                else:
+                    xpercent = x_relative_diff * 100
+                    ypercent = y_relative_diff * 100
+                    # print(">>>" , positions[i], f"x:{xpercent:.2f}% , y:{ypercent:.2f}%")
+                
                 fade_factor = i / len(positions)
                 transparency = int(255 * fade_factor)
                 faded_color_with_alpha = base_color + (transparency,)
@@ -165,6 +184,26 @@ class BallDetector:
                     fill=faded_color_with_alpha,
                     width=line_thickness
                 )
+                if isBad: 
+                    text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%\n BAD!!!!!!"
+                else:
+                    text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%"
+                background_color = (0, 0, 0)  # Adjust the color as needed
+                text_width = 300
+                text_height = 100
+                # Calculate the position for the text (bottom right corner)
+                text_position = (image_width - text_width - 10, image_height - text_height - 10)  # 10px padding from the edges
+
+                # Draw a filled rectangle over the previous text
+                draw.rectangle(
+                    [text_position, (image_width - 10, image_height - 10)],
+                    fill=background_color
+                )
+
+                # Draw the new text on top of the cleared area
+                draw.text(text_position, text, fill="white", font=font)
+
+
 
         # # Determine ROI based on the last known position
         # if positions[-1, 0] is not None and positions[-1, 1] is not None:
