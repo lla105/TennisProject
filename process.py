@@ -235,6 +235,15 @@ import cv2
 import os
 import numpy as np
 
+
+def get_unique_filename(output_folder , output_file) :
+    base_name = output_file
+    extension = '.mp4'
+    counter = 1
+    while os.path.isfile(os.path.join(output_folder , base_name+extension)):
+        base_name = f'{output_file}({counter})'
+        counter+=1
+    return base_name + extension
 """
 Creates a new video with only ball tracking overlay.
 :param input_video: str, path to the input video
@@ -252,9 +261,10 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    unique_output_file = get_unique_filename( output_folder , output_file )
     # Video writer to save the output
-    out = cv2.VideoWriter(os.path.join(output_folder, output_file + '.avi'),
-                          cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (width, height))
+    out = cv2.VideoWriter(os.path.join(output_folder, unique_output_file ),
+                          cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
     # Initialize frame counter
     frame_number = 0
     while True:
@@ -277,11 +287,12 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
         print(f'Processing frame {frame_number}/{length}', '\r', end='')
 
-    print(f'\nFinished processing video. Output saved as {output_file}.avi')
+    print(f'\nFinished processing video. Output saved as {output_file}.mp4')
 
     cap.release()
     out.release()
     cv2.destroyAllWindows()
+
 
 
 # def add_data_to_video(input_video, court_detector, players_detector, ball_detector, strokes_predictions, skeleton_df,

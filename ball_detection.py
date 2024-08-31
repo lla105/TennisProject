@@ -167,8 +167,8 @@ class BallDetector:
                     isBad = True
                     print(' OUTLIER!! : >>>(', positions[i][0], positions[i][1], ')')
                     # Use previous position to replace the outlier
-                    # positions[i][0] = positions[i-1][0]
-                    # positions[i][1] = positions[i-1][1]
+                    positions[i][0] = positions[i-1][0]
+                    positions[i][1] = positions[i-1][1]
                 else:
                     xpercent = x_relative_diff * 100
                     ypercent = y_relative_diff * 100
