@@ -24,7 +24,7 @@ class Smooth:
 
         # Smooth it out
         if df is not None:
-            df = self._swap_sides(df)
+            #df = self._swap_sides(df)
             # fill empty slots with data from before and after (limit the distance to 3) (if available)
             df = df.fillna(method='ffill', limit=3)
             df = df.fillna(method='bfill', limit=3)

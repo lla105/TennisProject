@@ -1,8 +1,7 @@
-from collections import deque
 import numpy as np
 import cv2
 import torch
-from PIL import Image, ImageDraw, ImageColor, ImageFont
+from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
@@ -10,8 +9,6 @@ from scipy.signal import find_peaks
 from src.ball_tracker_net import BallTrackerNet
 from src.detection import center_of_box
 from src.utils import get_video_properties
-import pandas as pd
-
 
 
 def combine_three_frames(frame1, frame2, frame3, width, height):
@@ -47,14 +44,10 @@ class BallDetector:
     Ball Detector model responsible for receiving the frames and detecting the ball
     """
     def __init__(self, save_state, out_channels=2):
-        self.search_radius = 50
-
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Load TrackNet model weights
         self.detector = BallTrackerNet(out_channels=out_channels)
-        # saved_state_dict = torch.load(save_state)
-        saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
-
+        saved_state_dict = torch.load(save_state)
         self.detector.load_state_dict(saved_state_dict['model_state'])
         self.detector.eval().to(self.device)
 
@@ -71,23 +64,6 @@ class BallDetector:
         self.xy_coordinates = np.array([[None, None], [None, None]])
 
         self.bounces_indices = []
-
-        self.ball_path_q = deque()
-
-    # def calculate_difference(self, x1, y1, x2, y2):
-    #     xdiff = abs(x1-x2)
-    #     ydiff = abs(y1-y2)
-    #     return ( xdiff/)
-
-
-    def interpolate_missing_ball_positions(self,ball_positions):
-        position_list = [x.get(1,[]) for x in ball_positions]
-        position_df = pd.DataFrame(position_list, columns=['x1','y1','x2','y2'])
-        position_df = position_df.interpolate()
-        position_df = position_df.bfill()
-        ball_positions = [{1:x} for x in position_df.to_numpy().tolist()]
-        return ball_positions
-    
 
     def detect_ball(self, frame):
         """
@@ -114,10 +90,6 @@ class BallDetector:
                 # Rescale the indices to fit frame dimensions
                 x = x * (self.video_width / self.model_input_width)
                 y = y * (self.video_height / self.model_input_height)
-                # print("!!!! ", x ,y, "\n")
-                # if len(self.ball_path_q) < 5:
-                #     self.ball_path_q.append( (x,y) )
-                # else:
 
                 # Check distance from previous location and remove outliers
                 if self.xy_coordinates[-1][0] is not None:
@@ -125,124 +97,7 @@ class BallDetector:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
 
-
-
-
-    def smooth_positions(self, positions):
-        smoothed_positions = []
-        for i in range(len(positions)):
-            # Filter out None values before computing the mean
-            valid_positions = [pos for pos in positions[:i+1] if pos[0] is not None and pos[1] is not None]
-            if valid_positions:  # Only calculate mean if there are valid positions
-                smoothed_positions.append(np.mean(valid_positions, axis=0))
-            else:
-                smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
-        return smoothed_positions
-
-    def mark_positions(self, frame, trail_length=10, frame_num=None, ball_color='yellow'):
-        base_color = ImageColor.getrgb(ball_color)
-        if frame_num is not None:
-            # Get positions from the frame number with a limit on trail length
-            positions = self.xy_coordinates[max(0, frame_num - trail_length + 1):frame_num + 1, :]
-        else:
-            # Get the last 'trail_length' positions
-            positions = self.xy_coordinates[-trail_length:, :]
-
-        # Apply smoothing
-        positions = self.smooth_positions(positions)
-
-        
-        # Append the current position
-        if frame_num is not None and len(self.xy_coordinates) > frame_num:
-            current_position = self.xy_coordinates[frame_num]
-            if current_position[0] is not None and current_position[1] is not None:
-                positions.append(current_position)
-            else:
-                positions.append((None, None))
-        
-        positions = np.array(positions)
-
-        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(pil_image)
-        draw = ImageDraw.Draw(pil_image, "RGBA")
-
-        font = ImageFont.load_default()
-        image_width = self.video_width
-        image_height = self.video_height
-
-        thicknesses = [1,2,3,4,5]
-
-        threshold_percentage = 0.2  # 20% threshold for relative differences
-
-        for i in range(1, len(positions)):
-            isBad = False
-            if positions[i-1][0] is not None and positions[i][0] is not None:
-                xdiff = abs(positions[i][0] - positions[i-1][0])
-                ydiff = abs(positions[i][1] - positions[i-1][1])
-                prev_x = positions[i-1][0]
-                prev_y = positions[i-1][1]
-
-                # Calculate relative differences
-                x_relative_diff = xdiff / prev_x if prev_x != 0 else 0
-                y_relative_diff = ydiff / prev_y if prev_y != 0 else 0
-
-                # Define outlier criteria
-                if x_relative_diff > threshold_percentage or y_relative_diff > threshold_percentage:
-                    isBad = True
-                    print(' OUTLIER!! : >>>(', positions[i][0], positions[i][1], ')')
-                    # Use previous position to replace the outlier
-                    positions[i][0] = positions[i-1][0]
-                    positions[i][1] = positions[i-1][1]
-                else:
-                    xpercent = x_relative_diff * 100
-                    ypercent = y_relative_diff * 100
-                    # print(">>>" , positions[i], f"x:{xpercent:.2f}% , y:{ypercent:.2f}%")
-                
-                fade_factor = i / len(positions)
-                transparency = int(255 * fade_factor)
-                faded_color_with_alpha = base_color + (transparency,)
-                line_thickness = thicknesses[min(i-1, len(thicknesses)-1)]
-
-                draw.line(
-                    (positions[i-1][0], positions[i-1][1], positions[i][0], positions[i][1]),
-                    fill=faded_color_with_alpha,
-                    width=line_thickness
-                )
-                if isBad: 
-                    text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%\n BAD!!!!!!"
-                else:
-                    text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%"
-                background_color = (0, 0, 0)  # Adjust the color as needed
-                text_width = 300
-                text_height = 100
-                # Calculate the position for the text (bottom right corner)
-                text_position = (image_width - text_width - 10, image_height - text_height - 10)  # 10px padding from the edges
-
-                # Draw a filled rectangle over the previous text
-                draw.rectangle(
-                    [text_position, (image_width - 10, image_height - 10)],
-                    fill=background_color
-                )
-
-                # Draw the new text on top of the cleared area
-                draw.text(text_position, text, fill="white", font=font)
-
-
-
-        # # Determine ROI based on the last known position
-        # if positions[-1, 0] is not None and positions[-1, 1] is not None:
-        #     last_known_position = positions[-1]
-        #     x, y = int(last_known_position[0]), int(last_known_position[1])
-        #     roi = (max(0, x - self.search_radius), max(0, y - self.search_radius),
-        #            min(frame.shape[1], x + self.search_radius) - max(0, x - self.search_radius),
-        #            min(frame.shape[0], y + self.search_radius) - max(0, y - self.search_radius))
-            
-
-        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-        return frame
-
-
-    def mark_positions2(self, frame, mark_num=15, frame_num=None, ball_color='yellow'):
+    def mark_positions(self, frame, mark_num=4, frame_num=None, ball_color='yellow'):
         """
         Mark the last 'mark_num' positions of the ball in the frame
         :param frame: the frame we mark the positions in
@@ -273,46 +128,44 @@ class BallDetector:
                 if bounce_i is not None and i == bounce_i:
                     draw.ellipse(bbox, outline='red')
                 else:
-                    # draw.ellipse(bbox, outline=ball_color)
-                    draw.ellipse(bbox, fill=ball_color)
+                    draw.ellipse(bbox, outline=ball_color)
 
             # Convert PIL image format back to opencv image format
             frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
         return frame
-    
-    # def show_y_graph(self, player_1_boxes, player_2_boxes):
-    #     """
-    #     Display ball y index positions and both players y index positions in all the frames in a graph
-    #     :param player_1_boxes: bottom player boxes
-    #     :param player_2_boxes: top player boxes
-    #     """
-    #     player_1_centers = np.array([center_of_box(box) for box in player_1_boxes])
-    #     player_1_y_values = player_1_centers[:, 1]
-    #     # get y value of top quarter of bottom player box
-    #     player_1_y_values -= np.array([(box[3] - box[1]) // 4 for box in player_1_boxes])
 
-    #     # Calculate top player boxes center
-    #     player_2_centers = []
-    #     for box in player_2_boxes:
-    #         if box[0] is not None:
-    #             player_2_centers.append(center_of_box(box))
-    #         else:
-    #             player_2_centers.append([None, None])
-    #     player_2_centers = np.array(player_2_centers)
-    #     player_2_y_values = player_2_centers[:, 1]
+    def show_y_graph(self, player_1_boxes, player_2_boxes):
+        """
+        Display ball y index positions and both players y index positions in all the frames in a graph
+        :param player_1_boxes: bottom player boxes
+        :param player_2_boxes: top player boxes
+        """
+        player_1_centers = np.array([center_of_box(box) for box in player_1_boxes])
+        player_1_y_values = player_1_centers[:, 1]
+        # get y value of top quarter of bottom player box
+        player_1_y_values -= np.array([(box[3] - box[1]) // 4 for box in player_1_boxes])
 
-    #     y_values = self.xy_coordinates[:, 1].copy()
-    #     x_values = self.xy_coordinates[:, 0].copy()
+        # Calculate top player boxes center
+        player_2_centers = []
+        for box in player_2_boxes:
+            if box[0] is not None:
+                player_2_centers.append(center_of_box(box))
+            else:
+                player_2_centers.append([None, None])
+        player_2_centers = np.array(player_2_centers)
+        player_2_y_values = player_2_centers[:, 1]
 
-    #     plt.figure()
-    #     plt.scatter(range(len(y_values)), y_values)
-    #     plt.plot(range(len(player_1_y_values)), player_1_y_values, color='r')
-    #     plt.plot(range(len(player_2_y_values)), player_2_y_values, color='g')
-    #     plt.show()
+        y_values = self.xy_coordinates[:, 1].copy()
+        x_values = self.xy_coordinates[:, 0].copy()
+
+        plt.figure()
+        plt.scatter(range(len(y_values)), y_values)
+        plt.plot(range(len(player_1_y_values)), player_1_y_values, color='r')
+        plt.plot(range(len(player_2_y_values)), player_2_y_values, color='g')
+        plt.show()
 
 
 if __name__ == "__main__":
-    print('====== RUNNING ball_dectection MAIN ======')
     ball_detector = BallDetector('saved states/tracknet_weights_lr_1.0_epochs_150_last_trained.pth')
     cap = cv2.VideoCapture('../videos/vid1.mp4')
     # get videos properties
