@@ -20,7 +20,17 @@ from src.stroke_recognition import ActionRecognition
 from utils import get_video_properties, get_dtype, get_stickman_line_connection
 from court_detection import CourtDetector
 import matplotlib.pyplot as plt
+import pandas as pd
 
+
+def interpolate_missing_ball_positions(ball_positions):
+    print(">>> ball position obj: " ,ball_positions)
+    position_list = [x.get(1,[]) for x in ball_positions]
+    position_df = pd.DataFrame(position_list, columns=['x1','y1','x2','y2'])
+    position_df = position_df.interpolate()
+    position_df = position_df.bfill()
+    ball_positions = [{1:x} for x in position_df.to_numpy().tolist()]
+    return ball_positions
 
 def get_stroke_predictions(video_path, stroke_recognition, strokes_frames, player_boxes):
     """
@@ -511,12 +521,18 @@ def video_process(video_path, show_video=False, include_video=True,
             # ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
             ball_detector.detect_ball(frame)
 
+            
+
             total_time += (time.time() - start_time)
             print('Processing frame %d/%d  FPS %04f' % (frame_i, length, frame_i / total_time), '\r', end='')
             if not frame_i % 100:
                 print('')
         else:
             break
+
+    #  ADD INTERPOLTING HEREE
+
+    # ball_detector = interpolate_missing_ball_positions(ball_detector)
     print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
     print('Processing completed')
     video.release()
@@ -570,7 +586,7 @@ def video_process(video_path, show_video=False, include_video=True,
 def main():
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
-    video_process(video_path='../videos/test3.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path='../videos/test4.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 

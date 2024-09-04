@@ -1,3 +1,4 @@
+from collections import deque
 import numpy as np
 import cv2
 import torch
@@ -9,6 +10,8 @@ from scipy.signal import find_peaks
 from src.ball_tracker_net import BallTrackerNet
 from src.detection import center_of_box
 from src.utils import get_video_properties
+import pandas as pd
+
 
 
 def combine_three_frames(frame1, frame2, frame3, width, height):
@@ -69,6 +72,23 @@ class BallDetector:
 
         self.bounces_indices = []
 
+        self.ball_path_q = deque()
+
+    # def calculate_difference(self, x1, y1, x2, y2):
+    #     xdiff = abs(x1-x2)
+    #     ydiff = abs(y1-y2)
+    #     return ( xdiff/)
+
+
+    def interpolate_missing_ball_positions(self,ball_positions):
+        position_list = [x.get(1,[]) for x in ball_positions]
+        position_df = pd.DataFrame(position_list, columns=['x1','y1','x2','y2'])
+        position_df = position_df.interpolate()
+        position_df = position_df.bfill()
+        ball_positions = [{1:x} for x in position_df.to_numpy().tolist()]
+        return ball_positions
+    
+
     def detect_ball(self, frame):
         """
         After receiving 3 consecutive frames, the ball will be detected using TrackNet model
@@ -94,6 +114,10 @@ class BallDetector:
                 # Rescale the indices to fit frame dimensions
                 x = x * (self.video_width / self.model_input_width)
                 y = y * (self.video_height / self.model_input_height)
+                # print("!!!! ", x ,y, "\n")
+                # if len(self.ball_path_q) < 5:
+                #     self.ball_path_q.append( (x,y) )
+                # else:
 
                 # Check distance from previous location and remove outliers
                 if self.xy_coordinates[-1][0] is not None:
@@ -115,7 +139,7 @@ class BallDetector:
                 smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
         return smoothed_positions
 
-    def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
+    def mark_positions(self, frame, trail_length=10, frame_num=None, ball_color='yellow'):
         base_color = ImageColor.getrgb(ball_color)
         if frame_num is not None:
             # Get positions from the frame number with a limit on trail length
@@ -218,43 +242,43 @@ class BallDetector:
         return frame
 
 
-    # def mark_positions(self, frame, mark_num=40, frame_num=None, ball_color='yellow'):
-    #     """
-    #     Mark the last 'mark_num' positions of the ball in the frame
-    #     :param frame: the frame we mark the positions in
-    #     :param mark_num: number of previous detection to mark
-    #     :param frame_num: current frame number
-    #     :param ball_color: color of the marks
-    #     :return: the frame with the ball annotations
-    #     """
-    #     bounce_i = None
-    #     # if frame number is not given, use the last positions found
-    #     if frame_num is not None:
-    #         q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
-    #         for i in range(frame_num - mark_num + 1, frame_num + 1):
-    #             if i in self.bounces_indices:
-    #                 bounce_i = i - frame_num + mark_num - 1
-    #                 break
-    #     else:
-    #         q = self.xy_coordinates[-mark_num:, :]
-    #     pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    #     pil_image = Image.fromarray(pil_image)
-    #     # Mark each position by a circle
-    #     for i in range(q.shape[0]):
-    #         if q[i, 0] is not None:
-    #             draw_x = q[i, 0]
-    #             draw_y = q[i, 1]
-    #             bbox = (draw_x - 2, draw_y - 2, draw_x + 2, draw_y + 2)
-    #             draw = ImageDraw.Draw(pil_image)
-    #             if bounce_i is not None and i == bounce_i:
-    #                 draw.ellipse(bbox, outline='red')
-    #             else:
-    #                 # draw.ellipse(bbox, outline=ball_color)
-    #                 draw.ellipse(bbox, fill=ball_color)
+    def mark_positions2(self, frame, mark_num=15, frame_num=None, ball_color='yellow'):
+        """
+        Mark the last 'mark_num' positions of the ball in the frame
+        :param frame: the frame we mark the positions in
+        :param mark_num: number of previous detection to mark
+        :param frame_num: current frame number
+        :param ball_color: color of the marks
+        :return: the frame with the ball annotations
+        """
+        bounce_i = None
+        # if frame number is not given, use the last positions found
+        if frame_num is not None:
+            q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
+            for i in range(frame_num - mark_num + 1, frame_num + 1):
+                if i in self.bounces_indices:
+                    bounce_i = i - frame_num + mark_num - 1
+                    break
+        else:
+            q = self.xy_coordinates[-mark_num:, :]
+        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(pil_image)
+        # Mark each position by a circle
+        for i in range(q.shape[0]):
+            if q[i, 0] is not None:
+                draw_x = q[i, 0]
+                draw_y = q[i, 1]
+                bbox = (draw_x - 2, draw_y - 2, draw_x + 2, draw_y + 2)
+                draw = ImageDraw.Draw(pil_image)
+                if bounce_i is not None and i == bounce_i:
+                    draw.ellipse(bbox, outline='red')
+                else:
+                    # draw.ellipse(bbox, outline=ball_color)
+                    draw.ellipse(bbox, fill=ball_color)
 
-    #         # Convert PIL image format back to opencv image format
-    #         frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    #     return frame
+            # Convert PIL image format back to opencv image format
+            frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        return frame
     
     # def show_y_graph(self, player_1_boxes, player_2_boxes):
     #     """
