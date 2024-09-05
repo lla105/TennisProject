@@ -12,17 +12,6 @@ class CourtDetector:
     Detecting and tracking court in frame
     """
     def __init__(self, verbose=0):
-        self.default_matrix = np.array([
-            [ 5.3877842e-01, -1.2027659e-01,  3.8562198e+02],
-            [ 1.0278886e-03,  1.1692125e-02,  3.5997208e+02],
-            [ 2.5761622e-06, -1.4505348e-04,  1.0000000e+00]
-        ], dtype=np.float32)
-        self.court_warp_matrix = []  # Initialize with an empty list or with predefined matrices as needed
-        self.court_reference = None  # Placeholder, set this to your actual court reference object
-        self.frame = None  # Placeholder, set this to your actual frame data
-
-
-
         self.verbose = verbose
         self.colour_threshold = 200
         self.dist_tau = 3
@@ -252,8 +241,6 @@ class CourtDetector:
                 for i, configuration in self.court_reference.court_conf.items():
                     # Find transformation
                     matrix, _ = cv2.findHomography(np.float32(configuration), np.float32(intersections), method=0)
-                    # inv_matrix = cv2.invert(matrix.astype(np.float32))[1]
-
                     inv_matrix = cv2.invert(matrix)[1]
                     # Get transformation score
                     confi_score = self._get_confi_score(matrix)
@@ -341,25 +328,9 @@ class CourtDetector:
         """
         Returns warped court using the reference court and the transformation of the court
         """
-        if not self.court_warp_matrix:
-            print("No court warp matrix available. Using default matrix.")
-            matrix = self.default_matrix
-        else:
-            matrix = np.array(self.court_warp_matrix[-1], dtype=np.float32)
-            if matrix.shape != (3, 3) or matrix.dtype not in [np.float32, np.float64]:
-                print(f"Invalid matrix shape {matrix.shape} or type {matrix.dtype}. Using default matrix.")
-                matrix = self.default_matrix
-        
-        print(type(matrix))
-        print(matrix)
-        
-        if self.court_reference is None or self.court_reference.court is None:
-            raise ValueError("Court reference is not properly initialized.")
-
-        court = cv2.warpPerspective(self.court_reference.court, matrix, self.frame.shape[1::-1])
+        court = cv2.warpPerspective(self.court_reference.court, self.court_warp_matrix[-1], self.frame.shape[1::-1])
         court[court > 0] = 1
         return court
-
 
     def _get_court_accuracy(self, verbose=0):
         """
