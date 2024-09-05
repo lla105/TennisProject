@@ -1,5 +1,7 @@
 import os
 import time
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import cv2
 import numpy as np
@@ -228,6 +230,55 @@ def mark_skeleton(skeleton_df, img, img_no_frame, frame_number):
     return img, img_no_frame
 
 
+def get_unique_filename(output_folder , output_file) :
+    base_name = output_file
+    extension = '.mp4'
+    counter = 1
+    while os.path.isfile(os.path.join(output_folder , base_name+extension)):
+        base_name = f'{output_file}({counter})'
+        counter+=1
+    return base_name + extension
+def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_folder, output_file):
+    # Read video file
+    cap = cv2.VideoCapture(input_video)
+    # Get video properties
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    unique_output_file = get_unique_filename( output_folder , output_file )
+    # Video writer to save the output
+    out = cv2.VideoWriter(os.path.join(output_folder, unique_output_file ),
+                          cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+    # Initialize frame counter
+    frame_number = 0
+    while True:
+        ret, img = cap.read()
+        if not ret:
+            break
+
+        # Add ball location
+        img = ball_detector.mark_positions(img, frame_num=frame_number)
+
+        # Display frame if needed
+        if show_video:
+            cv2.imshow('Output', img)
+            if cv2.waitKey(1) & 0xff == 27:  # Press 'Esc' to exit
+                break
+
+        # Save output video
+        out.write(img)
+        frame_number += 1
+
+        print(f'Processing frame {frame_number}/{length}', '\r', end='')
+
+    print(f'\nFinished processing video. Output saved as {output_file}.mp4')
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+
+    
 def add_data_to_video(input_video, court_detector, players_detector, ball_detector, strokes_predictions, skeleton_df,
                       statistics,
                       show_video, with_frame, output_folder, output_file, p1, p2, f_x, f_y):
@@ -488,11 +539,13 @@ def video_process(video_path, show_video=False, include_video=True,
     statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
     statistics.get_players_dists()
 
-    add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
-                      ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
-                      statistics=statistics,
-                      show_video=show_video, with_frame=1, output_folder=output_folder, output_file=output_file,
-                      p1=player_1_strokes_indices, p2=player_2_strokes_indices, f_x=f2_x, f_y=f2_y)
+    add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
+
+    # add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
+    #                   ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
+    #                   statistics=statistics,
+    #                   show_video=show_video, with_frame=1, output_folder=output_folder, output_file=output_file,
+    #                   p1=player_1_strokes_indices, p2=player_2_strokes_indices, f_x=f2_x, f_y=f2_y)
 
     # ball_detector.show_y_graph(detection_model.player_1_boxes, detection_model.player_2_boxes)
 
@@ -506,3 +559,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
