@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
 
-from src.ball_tracker_net import BallTrackerNet
-from src.detection import center_of_box
-from src.utils import get_video_properties
+from ball_tracker_net import BallTrackerNet
+from detection import center_of_box
+from utils import get_video_properties
 
 
 def combine_three_frames(frame1, frame2, frame3, width, height):

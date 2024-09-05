@@ -3,10 +3,10 @@ import torch.nn as nn
 from torchvision.transforms import ToTensor
 import seaborn as sn
 
-from src.datasets import create_train_valid_test_datasets, get_dataloaders, StrokesDataset
-from src.stroke_recognition import LSTM_model
+from datasets import create_train_valid_test_datasets, get_dataloaders, StrokesDataset
+from stroke_recognition import LSTM_model
 
-from src.utils import get_dtype
+from utils import get_dtype
 import time
 from torchvision import transforms
 from torch.utils.data import DataLoader

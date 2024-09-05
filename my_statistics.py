@@ -1,7 +1,7 @@
 import imutils
 
-from src.court_detection import CourtDetector
-from src.detection import DetectionModel
+from court_detection import CourtDetector
+from detection import DetectionModel
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.colors as mcolors
