@@ -18,7 +18,10 @@ from stroke_recognition import ActionRecognition
 from utils import get_video_properties, get_dtype, get_stickman_line_connection
 from court_detection import CourtDetector
 import matplotlib.pyplot as plt
+import pickle
 
+# usePrevpkl = False
+pkl_name = None
 
 def get_stroke_predictions(video_path, stroke_recognition, strokes_frames, player_boxes):
     """
@@ -432,7 +435,8 @@ def create_top_view(court_detector, detection_model):
 def video_process(video_path, show_video=False, include_video=True,
                   stickman=True, stickman_box=True, court=True,
                   output_file='output', output_folder='output',
-                  smoothing=True, top_view=True):
+                  smoothing=True, top_view=True, pkl_name=None,
+                  input_video_name='no video name'):
     """
     Takes videos of one person as input, and calculate the body pose and face landmarks, and saves them as csv files.
     Also, output a result videos with the keypoints marked.
@@ -449,97 +453,125 @@ def video_process(video_path, show_video=False, include_video=True,
     :return: None
     """
     dtype = get_dtype()
-
     # initialize extractors
     court_detector = CourtDetector()
     detection_model = DetectionModel(dtype=dtype)
     pose_extractor = PoseExtractor(person_num=1, box=stickman_box, dtype=dtype) if stickman else None
     stroke_recognition = ActionRecognition('storke_classifier_weights.pth')
     ball_detector = BallDetector('saved states/tracknet_weights_2_classes.pth', out_channels=2)
+    
+    if pkl_name :
+        with open(f'77frames.pkl', 'rb') as f:
+            ball_detector = pickle.load(f)
+    else:
 
-    # Load videos from videos path
-    video = cv2.VideoCapture(video_path)
+        # Load videos from videos path
+        video = cv2.VideoCapture(video_path)
 
-    # get videos properties
-    fps, length, v_width, v_height = get_video_properties(video)
+        # get videos properties
+        fps, length, v_width, v_height = get_video_properties(video)
 
-    # frame counter
-    frame_i = 0
+        # frame counter
+        frame_i = 0
 
-    # time counter
-    total_time = 0
+        # time counter
+        total_time = 0
 
-    # Loop over all frames in the videos
-    while True:
-        start_time = time.time()
-        ret, frame = video.read()
-        frame_i += 1
+        # Loop over all frames in the videos
+        while True:
+            start_time = time.time()
+            ret, frame = video.read()
+            frame_i += 1
 
-        if ret:
-            if frame_i == 1:
-                court_detector.detect(frame)
-                print(f'Court detection {"Success" if court_detector.success_flag else "Failed"}')
-                print(f'Time to detect court :  {time.time() - start_time} seconds')
-                start_time = time.time()
+            if ret:
+                if frame_i == 1:
+                    court_detector.detect(frame)
+                    print(f'Court detection {"Success" if court_detector.success_flag else "Failed"}')
+                    print(f'Time to detect court :  {time.time() - start_time} seconds')
+                    start_time = time.time()
 
-            court_detector.track_court(frame)
+                court_detector.track_court(frame)
 
-            # detect
-            detection_model.detect_player_1(frame.copy(), court_detector)
-            detection_model.detect_top_persons(frame, court_detector, frame_i)
+                # detect
+                detection_model.detect_player_1(frame.copy(), court_detector)
+                detection_model.detect_top_persons(frame, court_detector, frame_i)
 
-            # Create stick man figure (pose detection)
-            if stickman:
-                pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
+                # Create stick man figure (pose detection)
+                if stickman:
+                    pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
 
-            ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
+                ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
 
-            total_time += (time.time() - start_time)
-            print('Processing frame %d/%d  FPS %04f' % (frame_i, length, frame_i / total_time), '\r', end='')
-            if not frame_i % 100:
-                print('')
-        else:
-            break
-    print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
-    print('Processing completed')
-    video.release()
-    cv2.destroyAllWindows()
+                total_time += (time.time() - start_time)
+                print('Processing frame %d/%d  FPS %04f' % (frame_i, length, frame_i / total_time), '\r', end='')
+                if not frame_i % 100:
+                    print('')
+            else:
+                break
+        print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
+        print('Processing completed')
+        video.release()
+        cv2.destroyAllWindows()
 
-    detection_model.find_player_2_box()
+        detection_model.find_player_2_box()
 
-    if top_view:
-        create_top_view(court_detector, detection_model)
+        if top_view:
+            create_top_view(court_detector, detection_model)
 
-    # Save landmarks in csv files
-    df = None
-    # Save stickman data
-    if stickman:
-        df = pose_extractor.save_to_csv(output_folder)
+        # Save landmarks in csv files
+        df = None
+        # Save stickman data
+        if stickman:
+            df = pose_extractor.save_to_csv(output_folder)
 
-    # smooth the output data for better results
-    df_smooth = None
-    if smoothing:
-        smoother = Smooth()
-        df_smooth = smoother.smooth(df)
-        smoother.save_to_csv(output_folder)
+        # smooth the output data for better results
+        df_smooth = None
+        if smoothing:
+            smoother = Smooth()
+            df_smooth = smoother.smooth(df)
+            smoother.save_to_csv(output_folder)
 
-    player_1_strokes_indices, player_2_strokes_indices, bounces_indices, f2_x, f2_y = find_strokes_indices(
-        detection_model.player_1_boxes,
-        detection_model.player_2_boxes,
-        ball_detector.xy_coordinates,
-        df_smooth)
+        player_1_strokes_indices, player_2_strokes_indices, bounces_indices, f2_x, f2_y = find_strokes_indices(
+            detection_model.player_1_boxes,
+            detection_model.player_2_boxes,
+            ball_detector.xy_coordinates,
+            df_smooth)
 
-    '''ball_detector.bounces_indices = bounces_indices
-    ball_detector.coordinates = (f2_x, f2_y)'''
-    predictions = get_stroke_predictions(video_path, stroke_recognition,
-                                         player_1_strokes_indices, detection_model.player_1_boxes)
+        '''ball_detector.bounces_indices = bounces_indices
+        ball_detector.coordinates = (f2_x, f2_y)'''
+        predictions = get_stroke_predictions(video_path, stroke_recognition,
+                                            player_1_strokes_indices, detection_model.player_1_boxes)
 
-    statistics = Statistics(court_detector, detection_model)
-    heatmap = statistics.get_player_position_heatmap()
-    statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
-    statistics.get_players_dists()
+        statistics = Statistics(court_detector, detection_model)
+        heatmap = statistics.get_player_position_heatmap()
+        statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
+        statistics.get_players_dists()
+    print('1) video_path: ' , type(video_path), video_path)
+    print('2) ball_detector : ', type(ball_detector), ball_detector)
+    print('3) show_video : ', type(show_video) , show_video)
+    print('4) output_folder : ', type(output_folder), output_folder)
+    print('5) output_file : ', type(output_file), output_file)
+    print(os.getcwd())
 
-    add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
+
+
+    # # Print or compare attributes of the newly created and loaded ball_detector
+    # print("Newly created ball_detector attributes:", ball_detector.__dict__)
+    # print("Loaded ball_detector attributes:", loaded_ball_detector.__dict__)
+    if pkl_name is None:
+        try:
+            video_name = video_name
+            with open(f'{video_name}.pkl', 'wb') as f:
+                pickle.dump(ball_detector, f)
+            print(f" SAVED : ball_detector successfully saved to {video_name}.pkl")
+        except Exception as e:
+            print(f"Error saving ball_detector: {e}")
+    
+    add_ball_tracking_to_video(input_video=video_path, 
+                               ball_detector=ball_detector, 
+                               show_video=show_video, 
+                               output_folder=output_folder, 
+                               output_file=output_file)
 
     # add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
     #                   ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
@@ -552,8 +584,11 @@ def video_process(video_path, show_video=False, include_video=True,
 
 def main():
     s = time.time()
-    video_process(video_path='../videos/0828(7).mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
-                  court=True, top_view=True)
+    pkl_name = None
+    # pkl_name = '77frames'
+    videoname = '0828(2)'
+    video_process(video_path=f'../videos/{videoname}.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+                  court=True, top_view=True, pkl_name=pkl_name, input_video_name=videoname)
     print(f'Total computation time : {time.time() - s} seconds')
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import torch
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageColor
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
@@ -98,7 +98,100 @@ class BallDetector:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
 
-    def mark_positions(self, frame, mark_num=4, frame_num=None, ball_color='yellow'):
+
+
+    def smooth_positions(self, positions):
+        smoothed_positions = []
+        for i in range(len(positions)):
+            # Filter out None values before computing the mean
+            valid_positions = [pos for pos in positions[:i+1] if pos[0] is not None and pos[1] is not None]
+            if valid_positions:  # Only calculate mean if there are valid positions
+                smoothed_positions.append(np.mean(valid_positions, axis=0))
+            else:
+                smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
+        return smoothed_positions
+    
+
+    def mark_positions(self, frame, trail_length=10, frame_num=None, ball_color='yellow'):
+
+        """
+        Mark the last 'mark_num' positions of the ball in the frame
+        :param frame: the frame we mark the positions in
+        :param mark_num: number of previous detection to mark
+        :param frame_num: current frame number
+        :param ball_color: color of the marks
+        :return: the frame with the ball annotations
+        """
+        base_color = ImageColor.getrgb(ball_color)
+        if frame_num is not None:
+            # Get positions from the frame number with a limit on trail length
+            positions = self.xy_coordinates[max(0, frame_num - trail_length + 1):frame_num + 1, :]
+        else:
+            # Get the last 'trail_length' positions
+            positions = self.xy_coordinates[-trail_length:, :]
+
+        # # Apply smoothing
+        positions = self.smooth_positions(positions)
+
+        
+        # Append the current position
+        if frame_num is not None and len(self.xy_coordinates) > frame_num:
+            current_position = self.xy_coordinates[frame_num]
+            if current_position[0] is not None and current_position[1] is not None:
+                positions.append(current_position)
+            else:
+                positions.append((None, None))
+        
+        positions = np.array(positions)
+
+        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(pil_image)
+        draw = ImageDraw.Draw(pil_image, "RGBA")
+
+        thicknesses = [1,2,3,4,5]
+
+        threshold_percentage = 0.2  # 20% threshold for relative differences
+
+        for i in range(1, len(positions)):
+            isBad = False
+            if positions[i-1][0] is not None and positions[i][0] is not None:
+                xdiff = abs(positions[i][0] - positions[i-1][0])
+                ydiff = abs(positions[i][1] - positions[i-1][1])
+                prev_x = positions[i-1][0]
+                prev_y = positions[i-1][1]
+
+                # Calculate relative differences
+                x_relative_diff = xdiff / prev_x if prev_x != 0 else 0
+                y_relative_diff = ydiff / prev_y if prev_y != 0 else 0
+
+                # Define outlier criteria
+                if x_relative_diff > threshold_percentage or y_relative_diff > threshold_percentage:
+                    isBad = True
+                    print(' OUTLIER!! : >>>(', positions[i][0], positions[i][1], ')')
+                    # Use previous position to replace the outlier
+                    positions[i][0] = positions[i-1][0]
+                    positions[i][1] = positions[i-1][1]
+                else:
+                    xpercent = x_relative_diff * 100
+                    ypercent = y_relative_diff * 100
+                    # print(">>>" , positions[i], f"x:{xpercent:.2f}% , y:{ypercent:.2f}%")
+                
+                fade_factor = i / len(positions)
+                transparency = int(255 * fade_factor)
+                faded_color_with_alpha = base_color + (transparency,)
+                line_thickness = thicknesses[min(i-1, len(thicknesses)-1)]
+
+                draw.line(
+                    (positions[i-1][0], positions[i-1][1], positions[i][0], positions[i][1]),
+                    fill=faded_color_with_alpha,
+                    width=line_thickness
+                )
+        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        return frame
+    
+    
+
+    def mark_positions2(self, frame, mark_num=4, frame_num=None, ball_color='yellow'):
         """
         Mark the last 'mark_num' positions of the ball in the frame
         :param frame: the frame we mark the positions in
