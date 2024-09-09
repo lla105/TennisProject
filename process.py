@@ -273,7 +273,8 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
             break
 
         # Add ball location
-        img = ball_detector.mark_positions(img, frame_num=frame_number)
+        img = ball_detector.mark_positions1(img, frame_num=frame_number)
+        # img = ball_detector.mark_positions2(img, frame_num=frame_number)
 
         # Display frame if needed
         if show_video:
@@ -570,7 +571,12 @@ def video_process(video_path, show_video=False, include_video=True,
 def main():
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
-    video_process(video_path='../videos/0828.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    videoname = '34frames'
+    # videoname = '19secs'
+    # videoname = '16secs'
+    # videoname = 'temp8'
+
+    video_process(video_path=f'../videos/{videoname}.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 

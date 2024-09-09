@@ -115,7 +115,7 @@ class BallDetector:
                 smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
         return smoothed_positions
 
-    def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
+    def mark_positions2(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
         base_color = ImageColor.getrgb(ball_color)
         if frame_num is not None:
             # Get positions from the frame number with a limit on trail length
@@ -184,10 +184,10 @@ class BallDetector:
                     fill=faded_color_with_alpha,
                     width=line_thickness
                 )
-                if isBad: 
-                    text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%\n BAD!!!!!!"
-                else:
-                    text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%"
+                # if isBad: 
+                #     text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%\n BAD!!!!!!"
+                # else:
+                #     text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%"
                 background_color = (0, 0, 0)  # Adjust the color as needed
                 text_width = 300
                 text_height = 100
@@ -195,13 +195,13 @@ class BallDetector:
                 text_position = (image_width - text_width - 10, image_height - text_height - 10)  # 10px padding from the edges
 
                 # Draw a filled rectangle over the previous text
-                draw.rectangle(
-                    [text_position, (image_width - 10, image_height - 10)],
-                    fill=background_color
-                )
+                # draw.rectangle(
+                #     [text_position, (image_width - 10, image_height - 10)],
+                #     fill=background_color
+                # )
 
-                # Draw the new text on top of the cleared area
-                draw.text(text_position, text, fill="white", font=font)
+                # # Draw the new text on top of the cleared area
+                # draw.text(text_position, text, fill="white", font=font)
 
 
 
@@ -218,7 +218,80 @@ class BallDetector:
         return frame
 
 
-    # def mark_positions(self, frame, mark_num=40, frame_num=None, ball_color='yellow'):
+    def interpolate_color(self, start_color, end_color, factor):
+        """
+        Interpolates between two RGB colors.
+        :param start_color: The starting color (as an RGB tuple)
+        :param end_color: The ending color (as an RGB tuple)
+        :param factor: A value between 0 and 1, where 0 means start_color and 1 means end_color
+        :return: The interpolated color as an RGB tuple
+        """
+        return tuple(
+            int(start_color[j] + factor * (end_color[j] - start_color[j]))
+            for j in range(3)
+        )
+
+    def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
+        bounce_i = None
+        
+        # Define RGB colors for transitions
+        ball_color_rgb = (255, 0, 0)   # Yellow
+        orange_rgb = (255, 165, 0)       # Orange
+        red_rgb = (255, 255, 0)            # Red
+        
+        # If frame number is provided, use the relevant slice of xy_coordinates
+        if frame_num is not None:
+            q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
+            for i in range(frame_num - mark_num + 1, frame_num + 1):
+                if i in self.bounces_indices:
+                    bounce_i = i - frame_num + mark_num - 1
+                    break
+        else:
+            q = self.xy_coordinates[-mark_num:, :]
+        
+        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(pil_image)
+
+        # Mark each position by a circle
+        for i in range(q.shape[0]):
+            if q[i, 0] is not None:
+                draw_x = q[i, 0]
+                draw_y = q[i, 1]
+                
+
+                
+                # Assign colors: First 2 positions yellow, next 3 orange, last 2 red
+                if i < 2:
+                    current_color = ball_color_rgb  # Yellow
+                    radius = 2
+                elif i < 5:
+                    current_color = orange_rgb      # Orange
+                    radius = 3
+                else:
+                    current_color = red_rgb         # Red
+                    radius = 4
+
+                bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
+                draw = ImageDraw.Draw(pil_image)
+
+                if bounce_i is not None and i == bounce_i:
+                    # Draw bounce position with red color
+                    draw.ellipse(bbox, fill='red')
+                else:
+                    # Draw solid circles with the chosen color
+                    draw.ellipse(bbox, fill=current_color)
+
+        # Convert PIL image format back to OpenCV image format
+        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        
+        return frame
+
+
+
+
+
+
+    # def mark_positions1(self, frame, mark_num=10, frame_num=None, ball_color='yellow'):
     #     """
     #     Mark the last 'mark_num' positions of the ball in the frame
     #     :param frame: the frame we mark the positions in
