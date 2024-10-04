@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import torch
-from PIL import Image, ImageDraw, ImageColor, ImageFont
+from PIL import Image, ImageDraw, ImageColor, ImageFont, ImageEnhance
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
@@ -235,9 +235,9 @@ class BallDetector:
         bounce_i = None
         
         # Define RGB colors for transitions
-        ball_color_rgb = (255, 0, 0)   # Yellow
-        orange_rgb = (255, 165, 0)       # Orange
-        red_rgb = (255, 255, 0)            # Red
+        ball_color_rgb = (255, 0, 0, 200)   # Yellow
+        orange_rgb = (255, 165, 0, 200)       # Orange
+        red_rgb = (255, 255, 0,200)            # Red
         
         # If frame number is provided, use the relevant slice of xy_coordinates
         if frame_num is not None:
@@ -251,6 +251,8 @@ class BallDetector:
         
         pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(pil_image)
+        overlay = Image.new('RGBA', pil_image.size, (0, 0, 0, 0))  # Transparent overlay
+
 
         # Mark each position by a circle
         for i in range(q.shape[0]):
@@ -266,23 +268,26 @@ class BallDetector:
                     radius = 2
                 elif i < 5:
                     current_color = orange_rgb      # Orange
-                    radius = 3
+                    radius = 2
                 else:
                     current_color = red_rgb         # Red
                     radius = 4
 
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
-                draw = ImageDraw.Draw(pil_image)
+                draw = ImageDraw.Draw(overlay)
 
                 if bounce_i is not None and i == bounce_i:
                     # Draw bounce position with red color
-                    draw.ellipse(bbox, fill='red')
+                    draw.ellipse(bbox, fill=(255,0,0,255))
                 else:
                     # Draw solid circles with the chosen color
                     draw.ellipse(bbox, fill=current_color)
 
-        # Convert PIL image format back to OpenCV image format
-        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        # Composite the overlay with the original image
+        pil_image = Image.alpha_composite(pil_image.convert('RGBA'), overlay)
+
+        # Convert back to OpenCV format (BGR)
+        frame = cv2.cvtColor(np.array(pil_image.convert('RGB')), cv2.COLOR_RGB2BGR)
         
         return frame
 
