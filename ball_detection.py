@@ -234,10 +234,10 @@ class BallDetector:
     def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
         bounce_i = None
         
-        # Define RGB colors for transitions
-        ball_color_rgb = (255, 0, 0, 200)   # Yellow
-        orange_rgb = (255, 165, 0, 200)       # Orange
-        red_rgb = (255, 255, 0,200)            # Red
+        # Define RGB colors for transitions (50% opacity, alpha = 127)
+        ball_color_rgb = (255, 255, 0, 200)   # Yellow with 50% opacity
+        orange_rgb = (255, 165, 0, 175)       # Orange with 50% opacity
+        red_rgb = (255, 0, 0, 100)            # Red with 50% opacity
         
         # If frame number is provided, use the relevant slice of xy_coordinates
         if frame_num is not None:
@@ -260,27 +260,25 @@ class BallDetector:
                 draw_x = q[i, 0]
                 draw_y = q[i, 1]
                 
-
-                
                 # Assign colors: First 2 positions yellow, next 3 orange, last 2 red
                 if i < 2:
-                    current_color = ball_color_rgb  # Yellow
-                    radius = 2
+                    current_color =  red_rgb # Yellow
+                    radius = 2  # Smaller size
                 elif i < 5:
                     current_color = orange_rgb      # Orange
-                    radius = 2
+                    radius = 2  # Smaller size
                 else:
-                    current_color = red_rgb         # Red
-                    radius = 4
+                    current_color = ball_color_rgb         # Red
+                    radius = 3  # Slightly smaller than before
 
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
                 draw = ImageDraw.Draw(overlay)
 
                 if bounce_i is not None and i == bounce_i:
-                    # Draw bounce position with red color
-                    draw.ellipse(bbox, fill=(255,0,0,255))
+                    # Draw bounce position with fully opaque red color
+                    draw.ellipse(bbox, fill=(255, 0, 0, 255))  # Full opacity red for bounce
                 else:
-                    # Draw solid circles with the chosen color
+                    # Draw semi-transparent circles with the chosen color
                     draw.ellipse(bbox, fill=current_color)
 
         # Composite the overlay with the original image
@@ -290,6 +288,7 @@ class BallDetector:
         frame = cv2.cvtColor(np.array(pil_image.convert('RGB')), cv2.COLOR_RGB2BGR)
         
         return frame
+
 
 
 
