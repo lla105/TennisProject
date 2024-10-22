@@ -575,7 +575,7 @@ def main():
     # videoname = '19secs'
     # videoname = '16secs'
     # videoname = 'temp11'
-    videoname = 'test14'
+    videoname = 'test16'
 
     video_process(video_path=f'../videos/{videoname}.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True)
