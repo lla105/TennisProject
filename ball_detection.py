@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import cv2
 import torch
@@ -50,7 +51,9 @@ class BallDetector:
         # Load TrackNet model weights
         self.detector = BallTrackerNet(out_channels=out_channels)
         # saved_state_dict = torch.load(save_state)
-        saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
+        # saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
+        saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'), weights_only=False)
+
 
         self.detector.load_state_dict(saved_state_dict['model_state'])
         self.detector.eval().to(self.device)
@@ -68,6 +71,32 @@ class BallDetector:
         self.xy_coordinates = np.array([[None, None], [None, None]])
 
         self.bounces_indices = []
+
+
+    def get_coordinates_obj(self):
+        print('GET OBJ: ', self.xy_coordinates)
+        print(" xy coord type : ", type(self.xy_coordinates))
+        return self.xy_coordinates
+
+    def load_ball_coordinates(self, coordinates_file):
+        try:
+            xy_coordinates = np.load(coordinates_file, allow_pickle=True)
+            print(f"Loaded coordinates from {coordinates_file} with shape: {xy_coordinates.shape}")
+            return xy_coordinates
+        except Exception as e:
+            print(f"Failed to load coordinates from {coordinates_file}. Error: {e}")
+            return None
+        
+    def check_cache(self, videoname):
+        coordinates_file = f'output/{videoname}.npy'
+        if os.path.exists(coordinates_file):
+            print("Coordinates file found. Loading from file...")
+            self.xy_coordinates = self.load_ball_coordinates(coordinates_file)
+            print(' SELF XY CORRD: ' , self.xy_coordinates)
+            return True
+        else:
+            print(f' no cache found for output/{videoname}.npy!!!')
+            return False
 
     def detect_ball(self, frame):
         """
@@ -100,7 +129,8 @@ class BallDetector:
                     if np.linalg.norm(np.array([x,y]) - self.xy_coordinates[-1]) > self.threshold_dist:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
-
+            # print(' self. xy_coordinates : ', self.xy_coordinates)
+            # print(np)
 
 
 
@@ -231,6 +261,10 @@ class BallDetector:
             for j in range(3)
         )
 
+
+    def printarray(self):
+        print('self.xy_coordinates :', self.xy_coordinates)
+        
     def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
         bounce_i = None
         
@@ -241,6 +275,7 @@ class BallDetector:
         
         # If frame number is provided, use the relevant slice of xy_coordinates
         if frame_num is not None:
+            print('frame_num: ', frame_num)
             q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
             for i in range(frame_num - mark_num + 1, frame_num + 1):
                 if i in self.bounces_indices:
