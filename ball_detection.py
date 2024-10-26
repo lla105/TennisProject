@@ -269,13 +269,13 @@ class BallDetector:
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
-        ball_color_rgb = (255, 255, 0, 200)   # Yellow with 50% opacity
-        orange_rgb = (255, 165, 0, 175)       # Orange with 50% opacity
-        red_rgb = (255, 0, 0, 100)            # Red with 50% opacity
+        ball_color_rgb = (255, 255, 0, 150)   # Yellow with 50% opacity
+        orange_rgb = (255, 165, 0, 140)       # Orange with 50% opacity
+        red_rgb = (255, 0, 0, 130)            # Red with 50% opacity
         
         # If frame number is provided, use the relevant slice of xy_coordinates
         if frame_num is not None:
-            print('frame_num: ', frame_num)
+            # print('frame_num: ', frame_num)
             q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
             for i in range(frame_num - mark_num + 1, frame_num + 1):
                 if i in self.bounces_indices:
@@ -297,14 +297,14 @@ class BallDetector:
                 
                 # Assign colors: First 2 positions yellow, next 3 orange, last 2 red
                 if i < 2:
-                    current_color =  red_rgb # Yellow
-                    radius = 2  # Smaller size
+                    current_color =  red_rgb # Red
+                    radius = 3 # Smaller size
                 elif i < 5:
-                    current_color = orange_rgb      # Orange
-                    radius = 2  # Smaller size
+                    current_color = orange_rgb # Orange
+                    radius = 4 # Smaller size
                 else:
-                    current_color = ball_color_rgb         # Red
-                    radius = 3  # Slightly smaller than before
+                    current_color = ball_color_rgb # Yellow
+                    radius = 5
 
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
                 draw = ImageDraw.Draw(overlay)

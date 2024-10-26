@@ -397,15 +397,16 @@ def main():
         print()
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
-    videoname = '34frames'
+    # videoname = '34frames'
     # videoname = '19secs'
     # videoname = '16secs'
     # videoname = 'temp11'
-    # videoname = 'test164k'
+    # videoname = 'test16_4k'
     # videoname = 'small'
     # videoname = ''
+    videoname = 'test19'
 
-    video_process(video_path=f'../videos/{videoname}.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path=f'../videos/{videoname}.mov', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
     print(f'Total computation time : {time.time() - s} seconds')
 
