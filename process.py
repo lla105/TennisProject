@@ -403,7 +403,6 @@ def main():
     # videoname = 'temp11'
     # videoname = 'test16_4k'
     # videoname = 'small'
-    # videoname = ''
     videoname = 'test19'
 
     video_process(video_path=f'../videos/{videoname}.mov', show_video=True, stickman=True, stickman_box=False, smoothing=True,
