@@ -1,7 +1,8 @@
+import os
 import numpy as np
 import cv2
 import torch
-from PIL import Image, ImageDraw, ImageColor
+from PIL import Image, ImageDraw, ImageColor, ImageFont, ImageEnhance
 import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks
@@ -50,7 +51,9 @@ class BallDetector:
         # Load TrackNet model weights
         self.detector = BallTrackerNet(out_channels=out_channels)
         # saved_state_dict = torch.load(save_state)
-        saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
+        # saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
+        saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'), weights_only=False)
+
 
         self.detector.load_state_dict(saved_state_dict['model_state'])
         self.detector.eval().to(self.device)
@@ -68,6 +71,32 @@ class BallDetector:
         self.xy_coordinates = np.array([[None, None], [None, None]])
 
         self.bounces_indices = []
+
+
+    def get_coordinates_obj(self):
+        print('GET OBJ: ', self.xy_coordinates)
+        print(" xy coord type : ", type(self.xy_coordinates))
+        return self.xy_coordinates
+
+    def load_ball_coordinates(self, coordinates_file):
+        try:
+            xy_coordinates = np.load(coordinates_file, allow_pickle=True)
+            print(f"Loaded coordinates from {coordinates_file} with shape: {xy_coordinates.shape}")
+            return xy_coordinates
+        except Exception as e:
+            print(f"Failed to load coordinates from {coordinates_file}. Error: {e}")
+            return None
+        
+    def check_cache(self, videoname):
+        coordinates_file = f'output/{videoname}.npy'
+        if os.path.exists(coordinates_file):
+            print("Coordinates file found. Loading from file...")
+            self.xy_coordinates = self.load_ball_coordinates(coordinates_file)
+            print(' SELF XY CORRD: ' , self.xy_coordinates)
+            return True
+        else:
+            print(f' no cache found for output/{videoname}.npy!!!')
+            return False
 
     def detect_ball(self, frame):
         """
@@ -100,8 +129,231 @@ class BallDetector:
                     if np.linalg.norm(np.array([x,y]) - self.xy_coordinates[-1]) > self.threshold_dist:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
+            # print(' self. xy_coordinates : ', self.xy_coordinates)
+            # print(np)
 
-    # def mark_positions(self, frame, mark_num=40, frame_num=None, ball_color='yellow'):
+
+
+    def smooth_positions(self, positions):
+        smoothed_positions = []
+        for i in range(len(positions)):
+            # Filter out None values before computing the mean
+            valid_positions = [pos for pos in positions[:i+1] if pos[0] is not None and pos[1] is not None]
+            if valid_positions:  # Only calculate mean if there are valid positions
+                smoothed_positions.append(np.mean(valid_positions, axis=0))
+            else:
+                smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
+        return smoothed_positions
+
+    # TRAIL LINE 
+    def mark_positions2(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
+        base_color = ImageColor.getrgb(ball_color)
+        if frame_num is not None:
+            # Get positions from the frame number with a limit on trail length
+            positions = self.xy_coordinates[max(0, frame_num - trail_length + 1):frame_num + 1, :]
+        else:
+            # Get the last 'trail_length' positions
+            positions = self.xy_coordinates[-trail_length:, :]
+
+        # Apply smoothing
+        positions = self.smooth_positions(positions)
+
+        
+        # Append the current position
+        if frame_num is not None and len(self.xy_coordinates) > frame_num:
+            current_position = self.xy_coordinates[frame_num]
+            if current_position[0] is not None and current_position[1] is not None:
+                positions.append(current_position)
+            else:
+                positions.append((None, None))
+        
+        positions = np.array(positions)
+
+        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(pil_image)
+        draw = ImageDraw.Draw(pil_image, "RGBA")
+
+        font = ImageFont.load_default()
+        image_width = self.video_width
+        image_height = self.video_height
+
+        # thicknesses = [1,2,3,4,5]
+        thicknesses = [1,3,3,7,7]
+
+        threshold_percentage = 0.2  # 20% threshold for relative differences
+        red = (255,0,0)
+        orange = (255,165,0)
+        yellow = (255,255,0)
+        # gradient_ball_colors = []
+        for i in range(1, len(positions)):
+            isBad = False
+            if positions[i-1][0] is not None and positions[i][0] is not None:
+                xdiff = abs(positions[i][0] - positions[i-1][0])
+                ydiff = abs(positions[i][1] - positions[i-1][1])
+                prev_x = positions[i-1][0]
+                prev_y = positions[i-1][1]
+
+                # Calculate relative differences
+                x_relative_diff = xdiff / prev_x if prev_x != 0 else 0
+                y_relative_diff = ydiff / prev_y if prev_y != 0 else 0
+
+                # Define outlier criteria
+                if x_relative_diff > threshold_percentage or y_relative_diff > threshold_percentage:
+                    isBad = True
+                    print(' OUTLIER!! : >>>(', positions[i][0], positions[i][1], ')')
+                    # Use previous position to replace the outlier
+                    positions[i][0] = positions[i-1][0]
+                    positions[i][1] = positions[i-1][1]
+                else:
+                    xpercent = x_relative_diff * 100
+                    ypercent = y_relative_diff * 100
+                    # print(">>>" , positions[i], f"x:{xpercent:.2f}% , y:{ypercent:.2f}%")
+                
+                fade_factor = i / len(positions)
+                # fade_factor = fade_factor//2
+                transparency = int(255 * fade_factor)//2
+                if 0<i<=2 :
+                    color = red
+                elif 2<i<=4:
+                    color = orange
+                else:
+                    color = yellow
+                faded_color_with_alpha = color + (transparency,)
+                line_thickness = thicknesses[min(i-1, len(thicknesses)-1)]
+
+                draw.line(
+                    (positions[i-1][0], positions[i-1][1], positions[i][0], positions[i][1]),
+                    fill=faded_color_with_alpha,
+                    width=line_thickness
+                )
+                # if isBad: 
+                #     text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%\n BAD!!!!!!"
+                # else:
+                #     text = f"({positions[i][0]:.2f} , {positions[i][1]:.2f})\n{xpercent*100:.2f}%,    {ypercent*100:.2f}%"
+
+                # Draw a filled rectangle over the previous text
+                # draw.rectangle(
+                #     [text_position, (image_width - 10, image_height - 10)],
+                #     fill=background_color
+                # )
+
+                # # Draw the new text on top of the cleared area
+                # draw.text(text_position, text, fill="white", font=font)
+
+
+
+        # # Determine ROI based on the last known position
+        # if positions[-1, 0] is not None and positions[-1, 1] is not None:
+        #     last_known_position = positions[-1]
+        #     x, y = int(last_known_position[0]), int(last_known_position[1])
+        #     roi = (max(0, x - self.search_radius), max(0, y - self.search_radius),
+        #            min(frame.shape[1], x + self.search_radius) - max(0, x - self.search_radius),
+        #            min(frame.shape[0], y + self.search_radius) - max(0, y - self.search_radius))
+            
+
+        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        return frame
+
+
+    def interpolate_color(self, start_color, end_color, factor):
+        """
+        Interpolates between two RGB colors.
+        :param start_color: The starting color (as an RGB tuple)
+        :param end_color: The ending color (as an RGB tuple)
+        :param factor: A value between 0 and 1, where 0 means start_color and 1 means end_color
+        :return: The interpolated color as an RGB tuple
+        """
+        return tuple(
+            int(start_color[j] + factor * (end_color[j] - start_color[j]))
+            for j in range(3)
+        )
+
+
+    def printarray(self):
+        print('self.xy_coordinates :', self.xy_coordinates)
+        
+    def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
+        bounce_i = None
+        
+        # Define RGB colors for transitions (50% opacity, alpha = 127)
+        ball_color_rgb = (255, 255, 0, 150)   # Yellow with 50% opacity
+        orange_rgb = (255, 165, 0, 140)       # Orange with 50% opacity
+        red_rgb = (255, 0, 0, 130)            # Red with 50% opacity
+        blue_rgb = (0, 0, 255, 130)
+        green_rgb = (171, 225, 0, 130)
+        pink_rgb = (255,0,154, 130)
+        purple_rgb = (230,0,255,130)
+        light_yellow_rgb = (255,255,150,130)
+        white_rgb = (255,255,255,130)
+
+        
+        # If frame number is provided, use the relevant slice of xy_coordinates
+        if frame_num is not None:
+            # print('frame_num: ', frame_num)
+            q = self.xy_coordinates[frame_num-mark_num+1:frame_num+1, :]
+            for i in range(frame_num - mark_num + 1, frame_num + 1):
+                if i in self.bounces_indices:
+                    bounce_i = i - frame_num + mark_num - 1
+                    break
+        else:
+            q = self.xy_coordinates[-mark_num:, :]
+        
+        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(pil_image)
+        overlay = Image.new('RGBA', pil_image.size, (0, 0, 0, 0))  # Transparent overlay
+
+
+        # Mark each position by a circle
+        for i in range(q.shape[0]):
+            if q[i, 0] is not None:
+                draw_x = q[i, 0]
+                draw_y = q[i, 1]
+                
+                # # Assign colors: First 2 positions yellow, next 3 orange, last 2 red
+                # radius = 2
+                # dic = { 7:ball_color_rgb , 6:orange_rgb, 5:red_rgb, 4:pink_rgb, 3:purple_rgb, 2:blue_rgb, 1:green_rgb}
+                # if i not in dic:
+                #     current_color = green_rgb
+                # else:
+                #     current_color = dic[i]
+                if i < 2:
+                    current_color =  red_rgb # Red
+                    # current_color = white_rgb
+                    radius = 2 # Smaller size
+                elif i < 4:
+                    current_color = orange_rgb # Orange
+                    # current_color = light_yellow_rgb
+                    radius = 3 # Smaller size
+                else:
+                    current_color = ball_color_rgb # Yellow
+                    radius = 5
+
+                bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
+                draw = ImageDraw.Draw(overlay)
+
+                if bounce_i is not None and i == bounce_i:
+                    # Draw bounce position with fully opaque red color
+                    draw.ellipse(bbox, fill=(255, 0, 0, 255))  # Full opacity red for bounce
+                else:
+                    # Draw semi-transparent circles with the chosen color
+                    # draw.ellipse(bbox, fill=current_color)
+                    draw.ellipse(bbox, fill=current_color)
+
+        # Composite the overlay with the original image
+        pil_image = Image.alpha_composite(pil_image.convert('RGBA'), overlay)
+
+        # Convert back to OpenCV format (BGR)
+        frame = cv2.cvtColor(np.array(pil_image.convert('RGB')), cv2.COLOR_RGB2BGR)
+        
+        return frame
+
+
+
+
+
+
+
+    # def mark_positions1(self, frame, mark_num=10, frame_num=None, ball_color='yellow'):
     #     """
     #     Mark the last 'mark_num' positions of the ball in the frame
     #     :param frame: the frame we mark the positions in
@@ -138,124 +390,36 @@ class BallDetector:
     #         # Convert PIL image format back to opencv image format
     #         frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
     #     return frame
+    
+    # def show_y_graph(self, player_1_boxes, player_2_boxes):
+    #     """
+    #     Display ball y index positions and both players y index positions in all the frames in a graph
+    #     :param player_1_boxes: bottom player boxes
+    #     :param player_2_boxes: top player boxes
+    #     """
+    #     player_1_centers = np.array([center_of_box(box) for box in player_1_boxes])
+    #     player_1_y_values = player_1_centers[:, 1]
+    #     # get y value of top quarter of bottom player box
+    #     player_1_y_values -= np.array([(box[3] - box[1]) // 4 for box in player_1_boxes])
 
+    #     # Calculate top player boxes center
+    #     player_2_centers = []
+    #     for box in player_2_boxes:
+    #         if box[0] is not None:
+    #             player_2_centers.append(center_of_box(box))
+    #         else:
+    #             player_2_centers.append([None, None])
+    #     player_2_centers = np.array(player_2_centers)
+    #     player_2_y_values = player_2_centers[:, 1]
 
-    def smooth_positions(self, positions):
-        smoothed_positions = []
-        for i in range(len(positions)):
-            # Filter out None values before computing the mean
-            valid_positions = [pos for pos in positions[:i+1] if pos[0] is not None and pos[1] is not None]
-            if valid_positions:  # Only calculate mean if there are valid positions
-                smoothed_positions.append(np.mean(valid_positions, axis=0))
-            else:
-                smoothed_positions.append((None, None))  # Or append a placeholder for no valid positions
-        return smoothed_positions
-    def detect_ball_in_roi(self, frame, roi):
-        # Crop the frame to the ROI
-        x, y, w, h = roi
-        cropped_frame = frame[y:y+h, x:x+w]
-        
-        # Perform object detection on the cropped frame
-        # (Replace this with your actual detection code)
-        detected_objects = self.yolo_detection(cropped_frame)
-        
-        # Adjust detected objects' coordinates to the original frame
-        for obj in detected_objects:
-            obj.x += x
-            obj.y += y
-        
-        return detected_objects
+    #     y_values = self.xy_coordinates[:, 1].copy()
+    #     x_values = self.xy_coordinates[:, 0].copy()
 
-    def mark_positions(self, frame, trail_length=5, frame_num=None, ball_color='yellow'):
-        base_color = ImageColor.getrgb(ball_color)
-        # If frame number is not given, use the last positions found
-        if frame_num is not None:
-            # Ensure there are enough positions
-            if frame_num - trail_length + 1 < 0:
-                positions = self.xy_coordinates[:frame_num + 1, :]
-            else:
-                positions = self.xy_coordinates[frame_num-trail_length+1:frame_num+1, :]
-        else:
-            positions = self.xy_coordinates[-trail_length:, :]
-
-        # Apply smoothing
-        # positions = self.smooth_positions(positions)
-        
-        # Append the current position
-        if frame_num is not None and len(self.xy_coordinates) > frame_num:
-            current_position = self.xy_coordinates[frame_num]
-            if current_position[0] is not None and current_position[1] is not None:
-                positions.append(current_position)
-            else:
-                positions.append((None, None))
-
-        positions = np.array(positions)
-        pil_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(pil_image)
-        draw = ImageDraw.Draw(pil_image, "RGBA")
-
-        thicknesses = [1,2,3,4,5]
-
-        for i in range(1, len(positions)):
-            if positions[i-1, 0] is not None and positions[i, 0] is not None:
-                fade_factor = i / len(positions)
-                transparency = int(255 * fade_factor)
-                faded_color_with_alpha = base_color + (transparency,)
-                line_thickness = thicknesses[min(i-1, len(thicknesses)-1)]
-
-                draw.line(
-                    (positions[i-1, 0], positions[i-1, 1], positions[i, 0], positions[i, 1]),
-                    fill=faded_color_with_alpha,
-                    width=line_thickness
-                )
-
-        # Determine ROI based on the last known position
-        if positions[-1, 0] is not None and positions[-1, 1] is not None:
-            last_known_position = positions[-1]
-            x, y = int(last_known_position[0]), int(last_known_position[1])
-            roi = (max(0, x - self.search_radius), max(0, y - self.search_radius),
-                   min(frame.shape[1], x + self.search_radius) - max(0, x - self.search_radius),
-                   min(frame.shape[0], y + self.search_radius) - max(0, y - self.search_radius))
-            
-            # Perform detection in the ROI
-            detected_objects = self.detect_ball_in_roi(frame, roi)
-            
-            # Process detected objects as needed
-
-        frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-        return frame
-
-
-
-    def show_y_graph(self, player_1_boxes, player_2_boxes):
-        """
-        Display ball y index positions and both players y index positions in all the frames in a graph
-        :param player_1_boxes: bottom player boxes
-        :param player_2_boxes: top player boxes
-        """
-        player_1_centers = np.array([center_of_box(box) for box in player_1_boxes])
-        player_1_y_values = player_1_centers[:, 1]
-        # get y value of top quarter of bottom player box
-        player_1_y_values -= np.array([(box[3] - box[1]) // 4 for box in player_1_boxes])
-
-        # Calculate top player boxes center
-        player_2_centers = []
-        for box in player_2_boxes:
-            if box[0] is not None:
-                player_2_centers.append(center_of_box(box))
-            else:
-                player_2_centers.append([None, None])
-        player_2_centers = np.array(player_2_centers)
-        player_2_y_values = player_2_centers[:, 1]
-
-        y_values = self.xy_coordinates[:, 1].copy()
-        x_values = self.xy_coordinates[:, 0].copy()
-
-        plt.figure()
-        plt.scatter(range(len(y_values)), y_values)
-        plt.plot(range(len(player_1_y_values)), player_1_y_values, color='r')
-        plt.plot(range(len(player_2_y_values)), player_2_y_values, color='g')
-        plt.show()
+    #     plt.figure()
+    #     plt.scatter(range(len(y_values)), y_values)
+    #     plt.plot(range(len(player_1_y_values)), player_1_y_values, color='r')
+    #     plt.plot(range(len(player_2_y_values)), player_2_y_values, color='g')
+    #     plt.show()
 
 
 if __name__ == "__main__":
