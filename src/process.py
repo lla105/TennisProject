@@ -417,8 +417,8 @@ def main():
     videoname = '16secs'
     videoname = 'temp11'
     # videoname = 'test16_4k'
-    videoname = 'small'
-    videoname = '1118 (1)'
+    # videoname = 'small'
+    # videoname = '1118 (1)'
 
     video_process(video_path=f'../videos/{videoname}.MP4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
