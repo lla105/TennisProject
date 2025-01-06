@@ -413,7 +413,7 @@ def main():
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
     # videoname = '34frames'
-    # videoname = '19secs'
+    videoname = '19secs'
     videoname = '16secs'
     videoname = 'temp11'
     # videoname = 'test16_4k'
