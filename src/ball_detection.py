@@ -272,7 +272,7 @@ class BallDetector:
     def printarray(self):
         print('self.xy_coordinates :', self.xy_coordinates)
         
-    def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
+    def mark_positions1(self, frame, mark_num=14, frame_num=None, ball_color='yellow'):
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
