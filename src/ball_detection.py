@@ -272,12 +272,12 @@ class BallDetector:
     def printarray(self):
         print('self.xy_coordinates :', self.xy_coordinates)
         
-    def mark_positions1(self, frame, mark_num=14, frame_num=None, ball_color='yellow'):
+    def mark_positions1(self, frame, mark_num=10, frame_num=None, ball_color='yellow'):
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
-        ball_color_rgb = (255, 255, 0, 150)   # Yellow with 50% opacity
-        orange_rgb = (255, 165, 0, 140)       # Orange with 50% opacity
+        ball_color_rgb = (255, 255, 0, 130)   # Yellow with 50% opacity
+        orange_rgb = (255, 165, 0, 130)       # Orange with 50% opacity
         red_rgb = (255, 0, 0, 130)            # Red with 50% opacity
         blue_rgb = (0, 0, 255, 130)
         green_rgb = (171, 225, 0, 130)
@@ -304,6 +304,10 @@ class BallDetector:
 
 
         # Mark each position by a circle
+        max_radius = 7
+        decrement_size = max_radius / 8 # is q.shape[0], except for first 7 iteration.
+        radius = 0
+        print(f' q.shape[0] = {q.shape[0]}')
         for i in range(q.shape[0]):
             if q[i, 0] is not None:
                 draw_x = q[i, 0]
@@ -316,18 +320,19 @@ class BallDetector:
                 #     current_color = green_rgb
                 # else:
                 #     current_color = dic[i]
-                if i < 2:
+                if i < 3:
                     current_color =  red_rgb # Red
                     # current_color = white_rgb
-                    radius = 2 # Smaller size
-                elif i < 4:
+                    # radius = 2 # Smaller size
+                elif i < 5:
                     current_color = orange_rgb # Orange
                     # current_color = light_yellow_rgb
-                    radius = 3 # Smaller size
+                    # radius = 3 # Smaller size
                 else:
                     current_color = ball_color_rgb # Yellow
-                    radius = 5
-
+                    # radius = 5
+                radius += decrement_size
+                # print('radius : ', radius , f'= ')
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
                 draw = ImageDraw.Draw(overlay)
 

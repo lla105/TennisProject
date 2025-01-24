@@ -419,7 +419,7 @@ def main():
     # videoname = 'test16_4k'
     # videoname = 'small'
     # videoname = '1118 (1)'
-    videoname = 'jan22'
+    videoname = 'jan24-1'
 
     video_process(video_path=f'../videos/{videoname}.mov', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
