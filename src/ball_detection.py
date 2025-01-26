@@ -272,7 +272,7 @@ class BallDetector:
     def printarray(self):
         print('self.xy_coordinates :', self.xy_coordinates)
         
-    def mark_positions1(self, frame, mark_num=10, frame_num=None, ball_color='yellow'):
+    def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
@@ -304,7 +304,7 @@ class BallDetector:
 
 
         # Mark each position by a circle
-        max_radius = 7
+        max_radius = 5
         decrement_size = max_radius / 8 # is q.shape[0], except for first 7 iteration.
         radius = 0
         print(f' q.shape[0] = {q.shape[0]}')
@@ -331,6 +331,7 @@ class BallDetector:
                 else:
                     current_color = ball_color_rgb # Yellow
                     # radius = 5
+                current_color = ball_color_rgb # Yellow
                 radius += decrement_size
                 # print('radius : ', radius , f'= ')
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
