@@ -417,7 +417,7 @@ def main():
     # videoname = '16secs'
     # videoname = 'temp11'
     # videoname = 'test16_4k'
-    # videoname = 'small'
+    videoname = 'small'
     videoname = '1118 (1)'
     videoname = '0125'
 
