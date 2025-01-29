@@ -14,4 +14,6 @@ myenv/
 *.so
 *.bin
 *.mp4
+*.MP4
 *.mov
+*.MOV
