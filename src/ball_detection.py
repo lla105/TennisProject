@@ -50,8 +50,6 @@ class BallDetector:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Load TrackNet model weights
         self.detector = BallTrackerNet(out_channels=out_channels)
-        # saved_state_dict = torch.load(save_state)
-        # saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
         saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'), weights_only=False)
 
 
@@ -95,7 +93,7 @@ class BallDetector:
             print(' SELF XY CORRD: ' , self.xy_coordinates)
             return True
         else:
-            print(f' no cache found for output/{videoname}.npy!!!')
+            print(f'No cache found for output/{videoname}.npy!!!')
             return False
 
     def detect_ball(self, frame):

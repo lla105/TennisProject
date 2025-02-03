@@ -1,7 +1,7 @@
 /images/
-/videos/
+# /videos/
 /.idea/
-/src/output/
+# /src/output/
 /*.docx
 /report/
 /dataset/

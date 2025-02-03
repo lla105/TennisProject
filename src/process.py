@@ -269,7 +269,8 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
     unique_output_file = get_unique_filename(output_folder, output_file)
     # temp_output_video = os.path.join(output_folder, "temp_video.mp4")
-
+    
+    fps = 60
     # Video writer to save the output
     out = cv2.VideoWriter(os.path.join(output_folder, unique_output_file ),
                           cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
@@ -277,14 +278,17 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
     # Initialize frame counter
     frame_number = 0
+    # Load ball coordinates from .npy file
+    ball_coordinates = ball_detector.get_coordinates_obj()
     while True:
         ret, img = cap.read()
         if not ret:
             break
-
-        # Add ball location
-        img = ball_detector.mark_positions1(img, frame_num=frame_number)
-        # img = ball_detector.mark_positions2(img, frame_num=frame_number)
+        # Check if the current frame has a valid ball position
+        if frame_number < len(ball_coordinates) and ball_coordinates[frame_number][0] is not None:
+            # Add ball location
+            # img = ball_detector.mark_positions1(img, frame_num=frame_number)
+            img = ball_detector.mark_positions2(img, frame_num=frame_number)
 
         # Display frame if needed
         if show_video:
@@ -351,7 +355,7 @@ def video_process(video_path, show_video=False, include_video=True,
     print(' video name is : ', videoname)
     has_cache = ball_detector.check_cache(videoname)
     if has_cache:
-        print(' !!!!!!!!!!!!!!!! has cache')
+        print('Has Cache!')
 
     # Load videos from videos path
     video = cv2.VideoCapture(video_path)
@@ -370,7 +374,6 @@ def video_process(video_path, show_video=False, include_video=True,
         start_time = time.time()
         ret, frame = video.read()
         frame_i += 1
-
         if ret:
             if frame_i == 1:
                 start_time = time.time()
@@ -384,7 +387,7 @@ def video_process(video_path, show_video=False, include_video=True,
         else:
             break
     # print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
-    print('Processing completed')
+    # print('Processing completed')
     
     coordinate_bulb = ball_detector.get_coordinates_obj()
     print(' process.py > coordinate bulb : ' , coordinate_bulb)
