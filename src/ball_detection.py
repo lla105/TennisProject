@@ -276,7 +276,7 @@ class BallDetector:
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
-        ball_color_rgb = (255, 255, 0, 150)   # Yellow with 50% opacity
+        ball_color_rgb = (255, 255, 0, 130)   # Yellow with 50% opacity
         orange_rgb = (255, 165, 0, 140)       # Orange with 50% opacity
         red_rgb = (255, 0, 0, 130)            # Red with 50% opacity
         blue_rgb = (0, 0, 255, 130)
@@ -319,14 +319,15 @@ class BallDetector:
                 if i < 2:
                     current_color =  red_rgb # Red
                     # current_color = white_rgb
-                    radius = 2 # Smaller size
+                    radius = 1 # Smaller size
                 elif i < 4:
                     current_color = orange_rgb # Orange
                     # current_color = light_yellow_rgb
-                    radius = 3 # Smaller size
+                    radius = 2 # Smaller size
                 else:
                     current_color = ball_color_rgb # Yellow
-                    radius = 5
+                    radius = 3
+                current_color = ball_color_rgb # Yellow
 
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
                 draw = ImageDraw.Draw(overlay)
