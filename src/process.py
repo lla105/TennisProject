@@ -421,7 +421,7 @@ def main():
     # videoname = '0221.MP4'
     videoname = 'Untitled'
 
-    video_process(video_path=f'../videos/{videoname}.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path=f'../videos/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
     print(f'Total computation time : {time.time() - s} seconds')
 
