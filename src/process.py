@@ -418,9 +418,10 @@ def main():
     # videoname = 'temp11'
     # videoname = 'test16_4k'
     # videoname = 'small'
-    videoname = '0221.MP4'
-    videoname = 'Untitled'
-
+    # videoname = '0221.MP4'
+    # videoname = 'Untitled'
+    videoname = '0224.MP4'
+    
     video_process(video_path=f'../videos/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
     print(f'Total computation time : {time.time() - s} seconds')
