@@ -421,7 +421,7 @@ def main():
     # videoname = '0221.MP4'
     # videoname = 'Untitled'
     videoname = '0224.MP4'
-    
+
     video_process(video_path=f'../videos/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
     print(f'Total computation time : {time.time() - s} seconds')
@@ -429,3 +429,27 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# def calculatePendingOrders(orderProcessTime, shiftDuration) :
+#     n = len(orderProcessTime)
+#     remainingTime = orderProcessTime[:]
+#     tempoutput = []
+#     processIndex = 0
+#     for i in range(len(shiftDuration)):
+#         shift = shiftDuration[i]
+#         timeLeft = shift
+#         if sum(remainingTime) < 1:
+#             remainingTime = orderProcessTime
+#             processIndex = 0
+#         while timeLeft > 0 and processIndex<n:
+#             if remainingTime[processIndex] > timeLeft:
+#                 remainingTime[processIndex] -= timeLeft
+#                 break
+#             else:
+#                 timeLeft -= remainingTime[processIndex]
+#                 remainingTime[processIndex] = 0
+#                 processIndex += 1
+#         jobleft = n - processIndex
+#         tempoutput.append(jobleft)
+#     return tempoutput
