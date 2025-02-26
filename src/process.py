@@ -431,25 +431,3 @@ if __name__ == "__main__":
     main()
 
 
-# def calculatePendingOrders(orderProcessTime, shiftDuration) :
-#     n = len(orderProcessTime)
-#     remainingTime = orderProcessTime[:]
-#     tempoutput = []
-#     processIndex = 0
-#     for i in range(len(shiftDuration)):
-#         shift = shiftDuration[i]
-#         timeLeft = shift
-#         if sum(remainingTime) < 1:
-#             remainingTime = orderProcessTime
-#             processIndex = 0
-#         while timeLeft > 0 and processIndex<n:
-#             if remainingTime[processIndex] > timeLeft:
-#                 remainingTime[processIndex] -= timeLeft
-#                 break
-#             else:
-#                 timeLeft -= remainingTime[processIndex]
-#                 remainingTime[processIndex] = 0
-#                 processIndex += 1
-#         jobleft = n - processIndex
-#         tempoutput.append(jobleft)
-#     return tempoutput
