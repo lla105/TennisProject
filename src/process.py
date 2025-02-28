@@ -384,7 +384,7 @@ def video_process(video_path, show_video=False, include_video=True,
         else:
             break
     # print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
-    print('Processing completed')
+    # print('Processing completed')
     
     coordinate_bulb = ball_detector.get_coordinates_obj()
     print(' process.py > coordinate bulb : ' , coordinate_bulb)
