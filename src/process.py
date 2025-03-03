@@ -387,7 +387,7 @@ def video_process(video_path, show_video=False, include_video=True,
     print('Processing completed')
     
     coordinate_bulb = ball_detector.get_coordinates_obj()
-    # print(' process.py > coordinate bulb : ' , coordinate_bulb)
+    print(' process.py > coordinate bulb : ' , coordinate_bulb)
     save_ball_coordinates(videoname, coordinate_bulb)
 
     video.release()
