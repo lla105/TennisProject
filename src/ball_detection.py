@@ -276,9 +276,9 @@ class BallDetector:
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
-        ball_color_rgb = (255, 255, 0, 130)   # Yellow with 50% opacity
-        orange_rgb = (255, 165, 0, 140)       # Orange with 50% opacity
-        red_rgb = (255, 0, 0, 130)            # Red with 50% opacity
+        ball_color_rgb = (255, 255, 0, 150)   # Yellow with 50% opacity
+        orange_rgb = (255, 165, 0, 150)       # Orange with 50% opacity
+        red_rgb = (255, 0, 0, 150)            # Red with 50% opacity
         blue_rgb = (0, 0, 255, 130)
         green_rgb = (171, 225, 0, 130)
         pink_rgb = (255,0,154, 130)
