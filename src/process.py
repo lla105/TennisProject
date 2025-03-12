@@ -414,7 +414,7 @@ def main():
     # MUST TURN ON : show_video , stickman , smoothing , 
     # videoname = '34frames'
     # videoname = '19secs'
-    videoname = '16secs'
+    # videoname = '16secs'
     # videoname = 'temp11'
     # videoname = 'test16_4k'
     # videoname = 'small'
