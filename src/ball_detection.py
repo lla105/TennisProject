@@ -272,7 +272,7 @@ class BallDetector:
     def printarray(self):
         print('self.xy_coordinates :', self.xy_coordinates)
         
-    def mark_positions1(self, frame, mark_num=7, frame_num=None, ball_color='yellow'):
+    def mark_positions1(self, frame, mark_num=10, frame_num=None, ball_color='yellow'):
         bounce_i = None
         
         # Define RGB colors for transitions (50% opacity, alpha = 127)
@@ -323,10 +323,10 @@ class BallDetector:
                 elif i < 4:
                     current_color = orange_rgb # Orange
                     # current_color = light_yellow_rgb
-                    radius = 2 # Smaller size
+                    radius = 3 # Smaller size
                 else:
                     current_color = ball_color_rgb # Yellow
-                    radius = 3
+                    radius = 4
                 current_color = ball_color_rgb # Yellow
 
                 bbox = (draw_x - radius, draw_y - radius, draw_x + radius, draw_y + radius)
