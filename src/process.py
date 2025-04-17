@@ -246,6 +246,31 @@ def get_unique_filename(output_folder , output_file) :
         counter+=1
     return base_name + extension
 
+
+def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_buffer):
+    ball_pos = coords[frame_idx]
+    if ball_pos is not None:
+        x, y = ball_pos
+        if (y - crop_size >= 0 and x - crop_size >= 0 and
+            y + crop_size <= frame.shape[0] and x + crop_size <= frame.shape[1]):
+            croppedFrame = frame[y - crop_size:y + crop_size, x - crop_size:x + crop_size].copy()
+            trail_buffer.append((croppedFrame, x, y))
+            if len(trail_buffer) > trail_length:
+                trail_buffer.pop(0)
+
+    # Draw afterimage trail
+    for i, (croppedFrame, cx, cy) in enumerate(trail_buffer):
+        # alpha = (i + 1) / trail_length
+        alpha = 1
+        h, w, _ = croppedFrame.shape
+        top = cy - h // 2
+        left = cx - w // 2
+
+        if 0 <= top and 0 <= left and top + h <= frame.shape[0] and left + w <= frame.shape[1]:
+            originalFrame = frame[top:top + h, left:left + w]
+            blended = cv2.addWeighted(originalFrame, 1 - alpha, croppedFrame, alpha, 0)
+            frame[top:top + h, left:left + w] = blended
+
 """
 Creates a new video with only ball tracking overlay.
 :param input_video: str, path to the input video
@@ -277,11 +302,31 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
     # Initialize frame counter
     frame_number = 0
+
+    trail_buffer = []
+    frame_idx = 0
+    fileName = "test3.MP4.npy"
+    folderPath = os.path.join( os.path.dirname( __file__) , "output/")
+    filePath = os.path.join( folderPath, fileName)
+    coords = np.load(filePath, allow_pickle=True)
+    coords = [(int(x), int(y)) if x is not None and y is not None else None for x, y in coords]
+    # print('coords: ')
+    # for each in coords:
+    #     print('>> ', each)
+    crop_size = 20
+    trail_length = 15
     while True:
         ret, img = cap.read()
         if not ret:
             break
 
+        frame = img
+        
+        after_image_effect(coords, crop_size=20, trail_length=15, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
+        out.write(frame)
+        frame_idx += 1
+
+        continue
         # Add ball location
         img = ball_detector.mark_positions1(img, frame_num=frame_number)
         # img = ball_detector.mark_positions2(img, frame_num=frame_number)
