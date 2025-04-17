@@ -46,15 +46,21 @@ class BallDetector:
     """
     def __init__(self, save_state, out_channels=2):
         self.search_radius = 50
+        # Automatically use MPS on Apple Silicon if available
+        if torch.backends.mps.is_available():
+            print('>>> MPS is availalbe')
+            self.device = torch.device("mps")
+        else:
+            print('>>> MPS NOT availalbe. use cuda or cpu')
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         # Load TrackNet model weights
         self.detector = BallTrackerNet(out_channels=out_channels)
         # saved_state_dict = torch.load(save_state)
         # saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'))
-        saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'), weights_only=False)
-
-
+        # saved_state_dict = torch.load(save_state, map_location=torch.device('cpu'), weights_only=False)
+        saved_state_dict = torch.load(save_state, map_location=self.device, weights_only=False)
         self.detector.load_state_dict(saved_state_dict['model_state'])
         self.detector.eval().to(self.device)
 

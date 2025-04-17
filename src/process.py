@@ -368,6 +368,8 @@ def video_process(video_path, show_video=False, include_video=True,
     # Loop over all frames in the videos
     while True:
         start_time = time.time()
+        # ret is boolean. True if a frame was read successfully
+        # frame is a NumPy array, has shape:(height,width,3), RGB pixel values.
         ret, frame = video.read()
         frame_i += 1
 
@@ -416,10 +418,10 @@ def main():
     # videoname = '19secs'
     # videoname = '16secs'
     # videoname = 'temp11'
-    videoname = 'test16_4k'
-    videoname = 'small'
-    videoname = '0221.MP4'
-    videoname = 'mar27a.MP4'
+    # videoname = 'test16_4k'
+    # videoname = 'small'
+    # videoname = '0221.MP4'
+    videoname = 'test2.MOV'
 
     video_process(video_path=f'../videos/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
