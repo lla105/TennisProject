@@ -341,52 +341,50 @@ def filter_tennis_ball_color_with_mask(bgr_image):
     filtered = bgr_image.astype(np.float32) * mask_3ch  # keep only ball pixels
     return filtered.astype(np.uint8), color_mask
 
+
+
 def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_buffer):
     """
-    Overlay an afterimage trail of a tennis ball on a video frame.
+    Overlay an afterimage trail of a tennis ball on a video frame, 
+    where each ghost persists for exactly `trail_length` frames.
     
-    coords: list of (x, y) coordinates per frame
-    crop_size: half-size of square to crop around ball
-    trail_length: number of frames to keep in trail
-    frame: current video frame (BGR numpy array)
-    frame_idx: index of the current frame
-    trail_buffer: list storing recent (filtered_crop, color_mask, x, y) tuples
+    trail_buffer holds tuples: (filtered_crop, color_mask, x, y, birth_frame_idx)
     """
-    # 1. Early exit if out of range
-    if frame_idx >= len(coords):
-        print(f"Leon Warning: index out of range: {frame_idx}/{len(coords)}")
-        return
-    
-    # 2. Crop and filter the ball region
-    ball_pos = coords[frame_idx]
-    if ball_pos is not None:
-        x, y = map(int, ball_pos)
-        top, left = y - crop_size, x - crop_size
-        bottom, right = y + crop_size, x + crop_size
-        h_frame, w_frame = frame.shape[:2]
-        
-        # Check boundaries
-        if 0 <= top < bottom <= h_frame and 0 <= left < right <= w_frame:
-            raw_crop = frame[top:bottom, left:right].copy()
-            filtered_crop, color_mask = filter_tennis_ball_color_with_mask(raw_crop)
-            trail_buffer.append((filtered_crop, color_mask, x, y))
-            if len(trail_buffer) > trail_length:
-                trail_buffer.pop(0)
-    
-    # 3. Draw the afterimage trail
-    for filtered_crop, color_mask, cx, cy in trail_buffer:
+    h_frame, w_frame = frame.shape[:2]
+
+    # 1) Prune any ghosts older than `trail_length` frames
+    trail_buffer[:] = [
+        (crop, cmask, x, y, b_idx)
+        for (crop, cmask, x, y, b_idx) in trail_buffer
+        if frame_idx - b_idx < trail_length
+    ]
+
+    # 2) If we have a valid ball coordinate, crop & filter and add a new ghost
+    if frame_idx < len(coords):
+        ball_pos = coords[frame_idx]
+        if ball_pos is not None:
+            x, y = map(int, ball_pos)
+            top, left = y - crop_size, x - crop_size
+            bottom, right = y + crop_size, x + crop_size
+
+            if 0 <= top < bottom <= h_frame and 0 <= left < right <= w_frame:
+                raw_crop = frame[top:bottom, left:right].copy()
+                filtered_crop, color_mask = filter_tennis_ball_color_with_mask(raw_crop)
+                trail_buffer.append((filtered_crop, color_mask, x, y, frame_idx))
+
+    # 3) Draw all remaining ghosts
+    for filtered_crop, color_mask, cx, cy, b_idx in trail_buffer:
         h, w = filtered_crop.shape[:2]
         top, left = cy - h // 2, cx - w // 2
-        h_frame, w_frame = frame.shape[:2]
-        
+
         if 0 <= top < top + h <= h_frame and 0 <= left < left + w <= w_frame:
             circle_mask = create_feathered_circle_mask((h, w), feather=6)
-            final_mask = color_mask * circle_mask
-            
-            for c in range(3):  # B, G, R channels
-                roi = frame[top:top + h, left:left + w, c].astype(np.float32)
-                crop = filtered_crop[:, :, c].astype(np.float32)
-                blended = roi * (1 - final_mask) + crop * final_mask
+            final_mask  = color_mask * circle_mask
+
+            for c in range(3):
+                roi   = frame[top:top + h, left:left + w, c].astype(np.float32)
+                cropc = filtered_crop[:, :, c].astype(np.float32)
+                blended = roi * (1 - final_mask) + cropc * final_mask
                 frame[top:top + h, left:left + w, c] = blended.astype(np.uint8)
 
 
