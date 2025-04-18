@@ -331,9 +331,8 @@ def after_image_effect_test(coords, crop_size, trail_length, frame, frame_idx, t
 
 def filter_tennis_ball_color_with_mask(bgr_image):
     hsv = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
-    lower_yellowgreen = np.array([25, 100, 100])
-    upper_yellowgreen = np.array([45, 255, 255])
-    
+    lower_yellowgreen = np.array([20, 60, 60])
+    upper_yellowgreen = np.array([75, 255, 255])
     color_mask = cv2.inRange(hsv, lower_yellowgreen, upper_yellowgreen)
     color_mask = color_mask.astype(np.float32) / 255  # convert to 0.0–1.0
 
