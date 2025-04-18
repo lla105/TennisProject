@@ -339,6 +339,7 @@ def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_
 
         if 0 <= top and 0 <= left and top + h <= frame.shape[0] and left + w <= frame.shape[1]:
             mask = create_feathered_circle_mask((h, w), feather=6)
+
             for c in range(3):  # loop over B, G, R channels
                 roi = frame[top:top + h, left:left + w, c]
                 crop = croppedFrame[:, :, c]
@@ -623,7 +624,7 @@ def main():
     # videoname = '0221.MP4'
     videoname = 'test4.MP4'
 
-    video_process(video_path=f'../videos/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path=f'../input/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
     print(f'Total computation time : {time.time() - s} seconds')
 
