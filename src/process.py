@@ -372,7 +372,8 @@ def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_
                 trail_buffer.append((filtered_crop, color_mask, x, y, frame_idx))
 
     # 3) Draw all remaining ghosts
-    for i, (croppedFrame, cx, cy) in enumerate(trail_buffer):
+    # for i, (croppedFrame, cx, cy) in enumerate(trail_buffer):
+    for i, (filtered_crop, color_mask, cx, cy, idx) in enumerate(trail_buffer):
         h, w = filtered_crop.shape[:2]
         top, left = cy - h // 2, cx - w // 2
 
