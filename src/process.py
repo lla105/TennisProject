@@ -286,22 +286,30 @@ def filter_outlier_coords(coords, window=5, max_jump_ratio=0.1):
 
 
 
-def create_feathered_circle_mask(size, feather=6):
+def create_feathered_circle_mask(size, feather=10):
     h, w = size
+    center = (w // 2, h // 2)
+    radius = min(h, w) // 2  # keep it full-size
+
+    # Start with a solid white circle on black background
     mask = np.zeros((h, w), dtype=np.uint8)
-    cv2.circle(mask, (w//2, h//2), min(h, w)//2 - 1, 255, -1)
-    mask = cv2.GaussianBlur(mask, (0, 0), feather)
+    cv2.circle(mask, center, radius, 255, -1)
+
+    # Feather it with Gaussian blur
+    mask = cv2.GaussianBlur(mask, (feather*2+1, feather*2+1), 0)
+
+    # Normalize to range [0.0, 1.0] for blending
     return mask.astype(np.float32) / 255
 
 
-def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_buffer):
+
+def after_image_effect_test(coords, crop_size, trail_length, frame, frame_idx, trail_buffer):
     if frame_idx >= len(coords) :
         print( f"Leon Warning: index out of range: {frame_idx}/ {len(coords)}")
         return
     ball_pos = coords[frame_idx]
-    testing = False
+    testing = True
     if testing:
-    # ======================================================
         if ball_pos is not None:
             x, y = ball_pos
             trail_buffer.append((x, y))
@@ -318,36 +326,68 @@ def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_
             # Draw with fading effect if you want (skip alpha blending, just shrink radius if needed)
             cv2.circle(frame, (cx, cy), radius, color, thickness)
         return
-    # ======================================================
 
+
+
+def filter_tennis_ball_color_with_mask(bgr_image):
+    hsv = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
+    lower_yellowgreen = np.array([25, 100, 100])
+    upper_yellowgreen = np.array([45, 255, 255])
+    
+    color_mask = cv2.inRange(hsv, lower_yellowgreen, upper_yellowgreen)
+    color_mask = color_mask.astype(np.float32) / 255  # convert to 0.0–1.0
+
+    mask_3ch = cv2.merge([color_mask]*3)
+    filtered = bgr_image.astype(np.float32) * mask_3ch  # keep only ball pixels
+    return filtered.astype(np.uint8), color_mask
+
+def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_buffer):
+    """
+    Overlay an afterimage trail of a tennis ball on a video frame.
+    
+    coords: list of (x, y) coordinates per frame
+    crop_size: half-size of square to crop around ball
+    trail_length: number of frames to keep in trail
+    frame: current video frame (BGR numpy array)
+    frame_idx: index of the current frame
+    trail_buffer: list storing recent (filtered_crop, color_mask, x, y) tuples
+    """
+    # 1. Early exit if out of range
+    if frame_idx >= len(coords):
+        print(f"Leon Warning: index out of range: {frame_idx}/{len(coords)}")
+        return
+    
+    # 2. Crop and filter the ball region
+    ball_pos = coords[frame_idx]
     if ball_pos is not None:
-        x, y = ball_pos
-        if (y - crop_size >= 0 and x - crop_size >= 0 and
-            y + crop_size <= frame.shape[0] and x + crop_size <= frame.shape[1]):
-            croppedFrame = frame[y - crop_size:y + crop_size, x - crop_size:x + crop_size].copy()
-            trail_buffer.append((croppedFrame, x, y))
+        x, y = map(int, ball_pos)
+        top, left = y - crop_size, x - crop_size
+        bottom, right = y + crop_size, x + crop_size
+        h_frame, w_frame = frame.shape[:2]
+        
+        # Check boundaries
+        if 0 <= top < bottom <= h_frame and 0 <= left < right <= w_frame:
+            raw_crop = frame[top:bottom, left:right].copy()
+            filtered_crop, color_mask = filter_tennis_ball_color_with_mask(raw_crop)
+            trail_buffer.append((filtered_crop, color_mask, x, y))
             if len(trail_buffer) > trail_length:
                 trail_buffer.pop(0)
-
-    # Draw afterimage trail
-    for i, (croppedFrame, cx, cy) in enumerate(trail_buffer):
-        # alpha = (i + 1) / trail_length
-        alpha = 1
-        h, w, _ = croppedFrame.shape
-        top = cy - h // 2
-        left = cx - w // 2
-
-        if 0 <= top and 0 <= left and top + h <= frame.shape[0] and left + w <= frame.shape[1]:
-            mask = create_feathered_circle_mask((h, w), feather=6)
-
-            for c in range(3):  # loop over B, G, R channels
-                roi = frame[top:top + h, left:left + w, c]
-                crop = croppedFrame[:, :, c]
-                blended = roi * (1 - mask) + crop * mask
+    
+    # 3. Draw the afterimage trail
+    for filtered_crop, color_mask, cx, cy in trail_buffer:
+        h, w = filtered_crop.shape[:2]
+        top, left = cy - h // 2, cx - w // 2
+        h_frame, w_frame = frame.shape[:2]
+        
+        if 0 <= top < top + h <= h_frame and 0 <= left < left + w <= w_frame:
+            circle_mask = create_feathered_circle_mask((h, w), feather=6)
+            final_mask = color_mask * circle_mask
+            
+            for c in range(3):  # B, G, R channels
+                roi = frame[top:top + h, left:left + w, c].astype(np.float32)
+                crop = filtered_crop[:, :, c].astype(np.float32)
+                blended = roi * (1 - final_mask) + crop * final_mask
                 frame[top:top + h, left:left + w, c] = blended.astype(np.uint8)
-            # originalFrame = frame[top:top + h, left:left + w]
-            # blended = cv2.addWeighted(originalFrame, 1 - alpha, croppedFrame, alpha, 0)
-            # frame[top:top + h, left:left + w] = blended
 
 
 def fill_in_blank_coords(coords):
@@ -477,7 +517,7 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
         frame = img
         
-        after_image_effect(coords, crop_size=20, trail_length=7, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
+        after_image_effect(coords, crop_size=30, trail_length=4, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
         out.write(frame)
         frame_idx += 1
 
