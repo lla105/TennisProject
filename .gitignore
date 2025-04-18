@@ -15,3 +15,7 @@ myenv/
 *.bin
 *.mp4
 *.csv
+*.npy
+*.mov
+*.MP4
+*.MOV
