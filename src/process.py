@@ -247,8 +247,79 @@ def get_unique_filename(output_folder , output_file) :
     return base_name + extension
 
 
+
+def filter_outlier_coords(coords, window=5, max_jump_ratio=0.1):
+    filtered = coords.copy()
+
+    # Find all valid indexes
+    valid_indices = [i for i, c in enumerate(coords) if c is not None]
+
+    for idx in valid_indices:
+        current = coords[idx]
+
+        # Grab past & future valid points
+        past = [coords[i] for i in valid_indices if i < idx][-window:]
+        future = [coords[i] for i in valid_indices if i > idx][:window]
+
+        if len(past) >= 2 and len(future) >= 2:
+            neighbors = past + future
+            avg_x = sum(p[0] for p in neighbors) / len(neighbors)
+            avg_y = sum(p[1] for p in neighbors) / len(neighbors)
+
+            dx = current[0] - avg_x
+            dy = current[1] - avg_y
+            dist = (dx**2 + dy**2) ** 0.5
+
+            # Estimate average motion distance between neighbors
+            dists = []
+            for i in range(1, len(neighbors)):
+                x1, y1 = neighbors[i-1]
+                x2, y2 = neighbors[i]
+                dists.append(((x2 - x1)**2 + (y2 - y1)**2) ** 0.5)
+            avg_motion = sum(dists) / len(dists)
+
+            # If current point deviates more than 2× local motion trend, it's a spike
+            if dist > avg_motion * (1 + max_jump_ratio):
+                filtered[idx] = None  # mark as unreliable
+
+    return filtered
+
+
+
+def create_feathered_circle_mask(size, feather=6):
+    h, w = size
+    mask = np.zeros((h, w), dtype=np.uint8)
+    cv2.circle(mask, (w//2, h//2), min(h, w)//2 - 1, 255, -1)
+    mask = cv2.GaussianBlur(mask, (0, 0), feather)
+    return mask.astype(np.float32) / 255
+
+
 def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_buffer):
+    if frame_idx >= len(coords) :
+        print( f"Leon Warning: index out of range: {frame_idx}/ {len(coords)}")
+        return
     ball_pos = coords[frame_idx]
+    testing = False
+    if testing:
+    # ======================================================
+        if ball_pos is not None:
+            x, y = ball_pos
+            trail_buffer.append((x, y))
+            if len(trail_buffer) > trail_length:
+                trail_buffer.pop(0)
+
+        # Draw red dot trail
+        for i, (cx, cy) in enumerate(trail_buffer):
+            alpha = (i + 1) / trail_length  # optional: control fade
+            radius = 6  # dot size
+            color = (0, 0, 255)  # red in BGR
+            thickness = -1  # filled circle
+
+            # Draw with fading effect if you want (skip alpha blending, just shrink radius if needed)
+            cv2.circle(frame, (cx, cy), radius, color, thickness)
+        return
+    # ======================================================
+
     if ball_pos is not None:
         x, y = ball_pos
         if (y - crop_size >= 0 and x - crop_size >= 0 and
@@ -267,9 +338,57 @@ def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_
         left = cx - w // 2
 
         if 0 <= top and 0 <= left and top + h <= frame.shape[0] and left + w <= frame.shape[1]:
-            originalFrame = frame[top:top + h, left:left + w]
-            blended = cv2.addWeighted(originalFrame, 1 - alpha, croppedFrame, alpha, 0)
-            frame[top:top + h, left:left + w] = blended
+            mask = create_feathered_circle_mask((h, w), feather=6)
+            for c in range(3):  # loop over B, G, R channels
+                roi = frame[top:top + h, left:left + w, c]
+                crop = croppedFrame[:, :, c]
+                blended = roi * (1 - mask) + crop * mask
+                frame[top:top + h, left:left + w, c] = blended.astype(np.uint8)
+            # originalFrame = frame[top:top + h, left:left + w]
+            # blended = cv2.addWeighted(originalFrame, 1 - alpha, croppedFrame, alpha, 0)
+            # frame[top:top + h, left:left + w] = blended
+
+
+def fill_in_blank_coords(coords):
+    new_coords = []
+    i = 0
+    while i < len(coords) and coords[i] is None:
+        new_coords.append(None)
+        i+=1
+
+    while i < len(coords):
+        current = coords[i]
+        if coords[i] is not None:
+            new_coords.append((int(current[0]), int(current[1])))
+            i += 1
+            continue
+
+        # print(f"{i} : {current}")    
+        # Otherwise, we hit a blank — let's interpolate
+        prev_idx = i - 1
+        next_idx = i + 1
+
+        while next_idx < len(coords) and coords[next_idx] is None:
+            next_idx += 1
+
+        if prev_idx >= 0 and next_idx < len(coords):
+            x1, y1 = coords[prev_idx]
+            x2, y2 = coords[next_idx]
+            steps = next_idx - prev_idx
+            for j in range(i, next_idx):
+                ratio = (j - prev_idx) / steps
+                xi = int(x1 + (x2 - x1) * ratio)
+                yi = int(y1 + (y2 - y1) * ratio)
+                new_coords.append((xi, yi))
+            i = next_idx  # skip to end of gap
+        else:
+            # Not enough info to interpolate — pad with None
+            new_coords.append(None)
+            i += 1
+
+    return new_coords
+
+
 
 """
 Creates a new video with only ball tracking overlay.
@@ -282,8 +401,13 @@ Creates a new video with only ball tracking overlay.
 """
 def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_folder, output_file):
     audio_file = os.path.join(output_folder, "temp_audio.aac")
-    subprocess.call(["ffmpeg", "-i", input_video, "-q:a", "0", "-map", "a", audio_file, "-y"])
-
+    # subprocess.call(["ffmpeg", "-i", input_video, "-q:a", "0", "-map", "a", audio_file, "-y"])
+    with open(os.devnull, 'w') as FNULL:
+        subprocess.call(
+            ["ffmpeg", "-i", input_video, "-q:a", "0", "-map", "a", audio_file, "-y"],
+            stdout=FNULL,
+            stderr=subprocess.STDOUT
+        )
     # Read video file
     cap = cv2.VideoCapture(input_video)
     # Get video properties
@@ -305,11 +429,40 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
     trail_buffer = []
     frame_idx = 0
-    fileName = "test3.MP4.npy"
+    print(' input_video : ', input_video)
+    fileName = "test4.MP4.npy"
     folderPath = os.path.join( os.path.dirname( __file__) , "output/")
     filePath = os.path.join( folderPath, fileName)
     coords = np.load(filePath, allow_pickle=True)
     coords = [(int(x), int(y)) if x is not None and y is not None else None for x, y in coords]
+    # coords = [(int(x), int(y)) if x is not None and y is not None else (None, None) for x, y in coords]
+    # new_coords = []
+    # test_coords = coords[:20]
+    test_coords = coords
+    # for item in coords:
+    print()
+    print()
+    # for i in range(len(test_coords)):
+    #     item = test_coords[i]
+    #     print(item)
+    # print()
+    # print()
+    # print()
+    # test_coords = filter_outlier_coords(coords, window=5, max_jump_ratio=0.1)
+    # coords2 = test_coords
+    # coords2 = fill_in_blank_coords(test_coords)
+    print('==============')
+    # print(f"{len(test_coords)} vs {len(coords2)}")
+    # for i in range(len(test_coords)):
+    #     print( test_coords[i] , ' vs ' , coords[i])
+
+        # print(coords[i])
+    # print('coords type:', type(coords), ' each item: ')
+
+    # for item in coords:
+    #     print('>>> ' , item)
+    # return
+
     # print('coords: ')
     # for each in coords:
     #     print('>> ', each)
@@ -322,11 +475,12 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
         frame = img
         
-        after_image_effect(coords, crop_size=20, trail_length=15, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
+        after_image_effect(coords, crop_size=20, trail_length=7, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
         out.write(frame)
         frame_idx += 1
 
         continue
+    
         # Add ball location
         img = ball_detector.mark_positions1(img, frame_num=frame_number)
         # img = ball_detector.mark_positions2(img, frame_num=frame_number)
@@ -398,6 +552,8 @@ def video_process(video_path, show_video=False, include_video=True,
     if has_cache:
         print(' !!!!!!!!!!!!!!!! has cache')
 
+    add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
+    return
     # Load videos from videos path
     video = cv2.VideoCapture(video_path)
 
@@ -435,15 +591,14 @@ def video_process(video_path, show_video=False, include_video=True,
     
     coordinate_bulb = ball_detector.get_coordinates_obj()
     print(' process.py > coordinate bulb : ' , coordinate_bulb)
-    save_ball_coordinates(videoname, coordinate_bulb)
+    cache_coordinates(videoname, coordinate_bulb) # save coordinates into npy cache
 
     video.release()
     cv2.destroyAllWindows()
-
     add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
 
 
-def save_ball_coordinates(videoname, coordinate_bulb):
+def cache_coordinates(videoname, coordinate_bulb):
     # Check if xy_coordinates is not empty before saving
     # if self.xy_coordinates.size > 0:
     output_file = f'output/{videoname}.npy'
@@ -466,7 +621,7 @@ def main():
     # videoname = 'test16_4k'
     # videoname = 'small'
     # videoname = '0221.MP4'
-    videoname = 'test3.MP4'
+    videoname = 'test4.MP4'
 
     video_process(video_path=f'../videos/{videoname}', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=False, top_view=True, videoname=videoname)
