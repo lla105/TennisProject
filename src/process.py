@@ -372,13 +372,14 @@ def after_image_effect(coords, crop_size, trail_length, frame, frame_idx, trail_
                 trail_buffer.append((filtered_crop, color_mask, x, y, frame_idx))
 
     # 3) Draw all remaining ghosts
-    for filtered_crop, color_mask, cx, cy, b_idx in trail_buffer:
+    for i, (croppedFrame, cx, cy) in enumerate(trail_buffer):
         h, w = filtered_crop.shape[:2]
         top, left = cy - h // 2, cx - w // 2
 
         if 0 <= top < top + h <= h_frame and 0 <= left < left + w <= w_frame:
+            alpha = (i + 1) / len(trail_buffer)  # oldest = faintest, newest = strongest
             circle_mask = create_feathered_circle_mask((h, w), feather=6)
-            final_mask  = color_mask * circle_mask
+            final_mask  = color_mask * circle_mask * alpha
 
             for c in range(3):
                 roi   = frame[top:top + h, left:left + w, c].astype(np.float32)
