@@ -475,37 +475,6 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
     filePath = os.path.join( folderPath, fileName)
     coords = np.load(filePath, allow_pickle=True)
     coords = [(int(x), int(y)) if x is not None and y is not None else None for x, y in coords]
-    # coords = [(int(x), int(y)) if x is not None and y is not None else (None, None) for x, y in coords]
-    # new_coords = []
-    # test_coords = coords[:20]
-    test_coords = coords
-    # for item in coords:
-    print()
-    print()
-    # for i in range(len(test_coords)):
-    #     item = test_coords[i]
-    #     print(item)
-    # print()
-    # print()
-    # print()
-    # test_coords = filter_outlier_coords(coords, window=5, max_jump_ratio=0.1)
-    # coords2 = test_coords
-    # coords2 = fill_in_blank_coords(test_coords)
-    print('==============')
-    # print(f"{len(test_coords)} vs {len(coords2)}")
-    # for i in range(len(test_coords)):
-    #     print( test_coords[i] , ' vs ' , coords[i])
-
-        # print(coords[i])
-    # print('coords type:', type(coords), ' each item: ')
-
-    # for item in coords:
-    #     print('>>> ' , item)
-    # return
-
-    # print('coords: ')
-    # for each in coords:
-    #     print('>> ', each)
     crop_size = 20
     trail_length = 15
     while True:
@@ -515,7 +484,7 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
 
         frame = img
         
-        after_image_effect(coords, crop_size=30, trail_length=4, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
+        after_image_effect(coords, crop_size=30, trail_length=7, frame=frame, frame_idx=frame_idx, trail_buffer=trail_buffer)
         out.write(frame)
         frame_idx += 1
 
@@ -594,6 +563,7 @@ def video_process(video_path, show_video=False, include_video=True,
 
     add_ball_tracking_to_video(input_video=video_path, ball_detector=ball_detector, show_video=show_video, output_folder=output_folder, output_file=output_file)
     return
+
     # Load videos from videos path
     video = cv2.VideoCapture(video_path)
 
