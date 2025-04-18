@@ -401,6 +401,7 @@ Creates a new video with only ball tracking overlay.
 :return: None
 """
 def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_folder, output_file):
+    # print()
     audio_file = os.path.join(output_folder, "temp_audio.aac")
     # subprocess.call(["ffmpeg", "-i", input_video, "-q:a", "0", "-map", "a", audio_file, "-y"])
     with open(os.devnull, 'w') as FNULL:
@@ -432,7 +433,7 @@ def add_ball_tracking_to_video(input_video, ball_detector, show_video, output_fo
     frame_idx = 0
     print(' input_video : ', input_video)
     fileName = "test4.MP4.npy"
-    folderPath = os.path.join( os.path.dirname( __file__) , "output/")
+    folderPath = os.path.join( os.path.dirname( __file__) , "..", "output/")
     filePath = os.path.join( folderPath, fileName)
     coords = np.load(filePath, allow_pickle=True)
     coords = [(int(x), int(y)) if x is not None and y is not None else None for x, y in coords]
@@ -539,7 +540,7 @@ def create_top_view(court_detector, detection_model):
 
 def video_process(video_path, show_video=False, include_video=True,
                   stickman=True, stickman_box=True, court=True,
-                  output_file='output', output_folder='output',
+                  output_file='output', output_folder='../output/',
                   smoothing=True, top_view=True, videoname='videoname'):
     # initialize extractors
     court_detector = CourtDetector()
@@ -615,12 +616,6 @@ def main():
         print()
     s = time.time()
     # MUST TURN ON : show_video , stickman , smoothing , 
-    # videoname = '34frames'
-    # videoname = '19secs'
-    # videoname = '16secs'
-    # videoname = 'temp11'
-    # videoname = 'test16_4k'
-    # videoname = 'small'
     # videoname = '0221.MP4'
     videoname = 'test4.MP4'
 
